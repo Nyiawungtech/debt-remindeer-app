@@ -1,0 +1,18 @@
+# Security model
+
+- Supabase Auth owns passwords, email/phone confirmation, sessions and TOTP. The client uses PKCE and per-tab session storage; closing the tab may require another login. Production Auth settings and outbound SMTP still need operator configuration.
+- Every debt, installment, payment, reminder and profile is keyed to its owner. Composite foreign keys prevent linking another account’s records. Clients receive SELECT privileges under RLS; public API wrappers run as invoker and call narrow functions in the unexposed `duewell_private` schema. Every mutation checks ownership. RLS identity checks are cached once per statement.
+- Verified TOTP factors require an AAL2 token for both database reads and mutations. This is enforced in PostgreSQL, not only in a hidden UI. Keep an account recovery process and Supabase administrator access: the app does not invent TOTP recovery codes.
+- Money uses integer cents. The database validates schedule totals, positive amounts and dates. Payments lock the installment row and use a caller request UUID, preventing concurrent overpayment and duplicate retries. Reversals preserve history.
+- Push endpoints are allowlisted in both the database and worker to avoid server-side fetches to arbitrary destinations. Subscriptions cannot be reassigned across accounts; signing out detaches the device. Authenticated clients cannot read stored push keys.
+- SMS destinations come from confirmed Supabase phone ownership, never a debt form. Consent records bind to the confirmed number. STOP webhooks disable SMS and cancel pending jobs. New phone numbers need verification and new consent. Notifications omit debt details by default.
+- Twilio webhook signatures are verified against the canonical external URL. The scheduler has its own random secret. Service-role access uses Supabase-injected modern keys. Delivery credentials are encrypted in Vault and exposed only through a service-role-only API; optional Edge environment settings take precedence.
+- The worker rechecks consent, channel preference and remaining balance immediately before dispatch. A payment made in the short interval after that check and before a provider accepts a message may still race with delivery. Already accepted messages cannot be recalled.
+- No exactly-once guarantee is claimed for network sends. Unknown results are marked uncertain rather than retried automatically. SMS “accepted” is separate from carrier “delivered”. Push and email show provider acceptance; no delivery/read receipt is fabricated.
+- Only public static assets are cached by the service worker. Real debt data is fetched after authentication and is not persisted in an offline cache. The demo uses separate, in-memory sample records.
+- User text is rendered as React text. No user content is interpreted as HTML. Static deployment headers restrict scripts, framing, API connections and sensitive browser features. Confirm the actual host applies them.
+- Account deletion requires a server-validated session, current password and AAL2 if enrolled, then cascades tracked data. Provider logs/backups have their own retention and are not falsely claimed to be erased instantly.
+
+Automated database tests run real PostgreSQL semantics through PGlite with test-only Auth schema stubs. They do not replace a deployed Supabase penetration test, provider policy review, dependency maintenance or an independent audit. No “unhackable”, bank-grade certification or production audit is claimed.
+
+- Request authorization also checks that the user and session still exist. A logged-out access token cannot continue reading or mutating the tracker until its normal JWT expiry.

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+.openai/
+.supabase/
+coverage/
+qa-mobile.html
+supabase/.temp/
+supabase/.branches/
