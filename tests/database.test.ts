@@ -153,41 +153,149 @@ describe("actual PostgreSQL ownership and financial invariants", () => {
       ),
     ).toBe(21000);
   });
-  it("requires verified phone consent for SMS and rejects SSRF push endpoints", async () => {
+  it("rejects deferred channels and preference changes even through direct RPCs", async () => {
     await owner();
-    await expect(
-      db.query("select public.set_reminders($1,$2,$3,$4)", [
-        iid,
-        ["sms"],
-        [1],
-        "09:00",
-      ]),
-    ).rejects.toThrow("opt in");
+    for (const channels of [["sms"], ["push"], ["email", "sms"], []])
+      await expect(
+        db.query("select public.set_reminders($1,$2,$3,$4)", [
+          iid,
+          channels,
+          [1],
+          "09:00",
+        ]),
+      ).rejects.toThrow("Only email");
+    for (const flags of [
+      [true, false],
+      [false, true],
+    ])
+      await expect(
+        db.query("select public.save_preferences($1,$2,$3,$4,$5,$6,$7)", [
+          "Alice",
+          "UTC",
+          "system",
+          true,
+          true,
+          ...flags,
+        ]),
+      ).rejects.toThrow("Only email");
     await expect(
       db.query("select public.register_push($1,$2,$3)", [
-        "https://127.0.0.1/internal",
+        "https://fcm.googleapis.com/fcm/send/old-client",
         "a".repeat(87),
         "b".repeat(22),
       ]),
-    ).rejects.toThrow("Unsupported");
+    ).rejects.toThrow("Only email");
+  });
+  it("schedules distinct email reminders in the account time zone", async () => {
+    await owner();
     await db.query("select public.save_preferences($1,$2,$3,$4,$5,$6,$7)", [
       "Alice",
       "America/New_York",
       "system",
       true,
       true,
-      true,
+      false,
       false,
     ]);
+    const result = await db.query<{ count: number }>(
+      "select public.set_reminders($1,$2,$3,$4) as count",
+      [iid, ["email"], [1, 1, 0], "09:00"],
+    );
+    expect(result.rows[0].count).toBe(2);
+    const rows = (
+      await db.query<{ channel: string; scheduled_at: Date }>(
+        "select channel,scheduled_at from public.reminders where active order by scheduled_at",
+      )
+    ).rows;
+    expect(rows.map((r) => r.channel)).toEqual(["email", "email"]);
+    expect(new Date(rows[0].scheduled_at).toISOString()).toBe(
+      "2027-12-02T14:00:00.000Z",
+    );
+  });
+  it("keeps deferred channels out of the queue and excludes their contact data from payloads", async () => {
+    await root();
+    await expect(
+      db.query(
+        "insert into public.reminders(owner_id,installment_id,channel,days_before,send_time,scheduled_at) values($1,$2,'sms',3,'09:00',now())",
+        [a, iid],
+      ),
+    ).rejects.toThrow("email_only_queue");
+    const id = (
+      await db.query<{ id: string }>(
+        "update public.reminders set state='processing' where installment_id=$1 and days_before=1 and active returning id",
+        [iid],
+      )
+    ).rows[0].id;
+    await db.exec("set role service_role");
+    const payload = (
+      await db.query<{ payload: Record<string, unknown> }>(
+        "select public.reminder_payload($1) as payload",
+        [id],
+      )
+    ).rows[0].payload;
+    expect(payload.channel).toBe("email");
+    expect(payload.email).toBe("a@example.com");
+    expect(payload.amount_cents).toBe(3500);
+    expect(payload).not.toHaveProperty("phone");
+    expect(payload).not.toHaveProperty("subscriptions");
+    await root();
+    await db.query("update public.reminders set state='pending' where id=$1", [
+      id,
+    ]);
+  });
+  it("cancels pending emails on opt-out and on time-zone changes", async () => {
+    await owner();
+    const prefs = [
+      "Alice",
+      "America/New_York",
+      "system",
+      true,
+      false,
+      false,
+      false,
+    ];
+    await db.query(
+      "select public.save_preferences($1,$2,$3,$4,$5,$6,$7)",
+      prefs,
+    );
+    expect(
+      (await db.query("select * from public.reminders where state='pending'"))
+        .rows,
+    ).toHaveLength(0);
+    await expect(
+      db.query("select public.set_reminders($1,$2,$3,$4)", [
+        iid,
+        ["email"],
+        [1],
+        "09:00",
+      ]),
+    ).rejects.toThrow("Enable email");
+    prefs[4] = true;
+    await db.query(
+      "select public.save_preferences($1,$2,$3,$4,$5,$6,$7)",
+      prefs,
+    );
     await db.query("select public.set_reminders($1,$2,$3,$4)", [
       iid,
-      ["sms", "email"],
+      ["email"],
+      [1],
+      "09:00",
+    ]);
+    prefs[1] = "UTC";
+    await db.query(
+      "select public.save_preferences($1,$2,$3,$4,$5,$6,$7)",
+      prefs,
+    );
+    expect(
+      (await db.query("select * from public.reminders where state='pending'"))
+        .rows,
+    ).toHaveLength(0);
+    await db.query("select public.set_reminders($1,$2,$3,$4)", [
+      iid,
+      ["email"],
       [1, 0],
       "09:00",
     ]);
-    expect(
-      (await db.query("select * from public.reminders where active")).rows,
-    ).toHaveLength(4);
   });
   it("cancels pending reminders after a complete payment and keeps reversal history", async () => {
     await owner();
@@ -232,24 +340,51 @@ describe("actual PostgreSQL ownership and financial invariants", () => {
     await owner(a, "aal2");
     expect((await db.query("select * from public.debts")).rows).toHaveLength(1);
   });
-  it("prevents unverified accounts from claiming consent", async () => {
+  it("requires confirmed email ownership before scheduling", async () => {
     await root();
     await db.query(
-      "update auth.users set phone_confirmed_at=null where id=$1",
+      "update auth.users set email_confirmed_at=null where id=$1",
       [b],
     );
     await owner(b);
+    await db.query("select public.create_debt($1,$2,$3,$4,$5,$6,$7::jsonb)", [
+      "88888888-8888-4888-8888-888888888888",
+      "Bob debt",
+      "",
+      "Other",
+      "",
+      100,
+      JSON.stringify([{ due_date: "2027-12-03", amount_cents: 100 }]),
+    ]);
+    const otherId = (
+      await db.query<{ id: string }>("select id from public.installments")
+    ).rows[0].id;
     await expect(
-      db.query("select public.save_preferences($1,$2,$3,$4,$5,$6,$7)", [
-        "Bob",
-        "UTC",
-        "light",
-        true,
-        true,
-        true,
-        false,
+      db.query("select public.set_reminders($1,$2,$3,$4)", [
+        otherId,
+        ["email"],
+        [1],
+        "09:00",
       ]),
-    ).rejects.toThrow("Verify your phone");
+    ).rejects.toThrow("verify your email");
+  });
+  it("keeps delivery credentials inaccessible to clients and omits inactive-provider settings", async () => {
+    await root();
+    await db.exec(
+      "insert into vault.decrypted_secrets values('duewell_resend_api_key','test-only'),('duewell_twilio_auth_token','inactive-test-only'),('duewell_vapid_private_key','inactive-test-only')",
+    );
+    await owner(b);
+    await expect(db.query("select public.delivery_config()")).rejects.toThrow(
+      "permission denied",
+    );
+    await root();
+    await db.exec("set role service_role");
+    const settings = (
+      await db.query<{ config: Record<string, string> }>(
+        "select public.delivery_config() as config",
+      )
+    ).rows[0].config;
+    expect(settings).toEqual({ RESEND_API_KEY: "test-only" });
   });
   it("expires uncertain processing leases without resending", async () => {
     await root();

@@ -1,5 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
-export type Channel = "push" | "email" | "sms";
+export type Channel = "email";
 export type Theme = "light" | "dark" | "system";
 export interface Profile {
   id: string;

@@ -5,12 +5,21 @@ function runtime() {
   const handlers: Record<string, Function> = {},
     shown: any[] = [],
     stored: any[] = [],
-    fetched: any[] = [];
+    fetched: any[] = [],
+    retired: string[] = [];
   const self = {
     location: { origin: "https://duewell.example" },
     addEventListener: (name: string, handler: Function) =>
       (handlers[name] = handler),
     registration: {
+      pushManager: {
+        getSubscription: async () => ({
+          unsubscribe: async () => {
+            retired.push("device");
+            return true;
+          },
+        }),
+      },
       showNotification: async (...args: any[]) => {
         shown.push(args);
       },
@@ -53,7 +62,7 @@ function runtime() {
       },
     },
   );
-  return { handlers, shown, stored, fetched };
+  return { handlers, shown, stored, fetched, retired };
 }
 it("only pre-caches public assets and an offline fallback", async () => {
   const r = runtime();
@@ -99,25 +108,13 @@ it("does not store account navigation responses", async () => {
   await task!;
   expect(r.stored).toHaveLength(0);
 });
-it("handles malformed pushes safely and prevents external notification links", async () => {
+it("retires existing push subscriptions while retaining PWA offline support", async () => {
   const r = runtime();
   let task: Promise<unknown>;
-  r.handlers.push({
-    data: {
-      json: () => ({ url: "https://attacker.example", body: "Reminder" }),
-    },
-    waitUntil: (p: Promise<unknown>) => (task = p),
-  });
+  r.handlers.activate({ waitUntil: (p: Promise<unknown>) => (task = p) });
   await task!;
-  expect(r.shown[0][1].data.url).toBe("/#reminders");
-  r.handlers.push({
-    data: {
-      json: () => {
-        throw new Error();
-      },
-    },
-    waitUntil: (p: Promise<unknown>) => (task = p),
-  });
-  await task!;
-  expect(r.shown[1][0]).toBe("Duewell reminder");
+  expect(r.retired).toEqual(["device"]);
+  expect(r.handlers.push).toBeUndefined();
+  expect(r.handlers.notificationclick).toBeUndefined();
+  expect(r.handlers.fetch).toBeTypeOf("function");
 });

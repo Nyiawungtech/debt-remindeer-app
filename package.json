@@ -12,7 +12,6 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "check": "tsc -b",
-    "keys:push": "web-push generate-vapid-keys",
     "backend:check": "deno check supabase/functions/*/index.ts"
   },
   "dependencies": {
@@ -27,15 +26,14 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.17",
+    "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^6.3.0",
     "deno": "^2.9.6",
     "prettier": "^3.10.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
-    "vitest": "^5.1.1",
-    "web-push": "^4.0.0"
+    "vitest": "^5.1.1"
   }
 }

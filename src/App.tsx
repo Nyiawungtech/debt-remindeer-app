@@ -31,7 +31,6 @@ import {
   Trash2,
   Pencil,
   Mail,
-  Smartphone,
   X,
   CircleAlert,
   Menu,
@@ -55,14 +54,12 @@ import {
   today,
   validatePayment,
   validateSchedule,
-  type Channel,
   type Debt,
   type Installment,
   type Period,
   type Profile,
   type Snapshot,
 } from "./lib/domain";
-import { detachPush, disablePush, enablePush, pushSupported } from "./lib/push";
 import { Auth } from "./components/Auth";
 import {
   Bar,
@@ -89,6 +86,7 @@ type ModalState = {
 type UI = {
   s: Snapshot;
   day: string;
+  email: string;
   demo: boolean;
   busy: boolean;
   act: Action;
@@ -243,7 +241,6 @@ export default function App() {
   async function signOut() {
     try {
       if (!demo) {
-        await detachPush();
         const { error } = await supabase!.auth.signOut();
         if (error) throw error;
       }
@@ -351,6 +348,7 @@ export default function App() {
       value={{
         s,
         day,
+        email: session?.user.email || (demo ? "alex@example.com" : ""),
         demo,
         busy,
         act: safeAct,
@@ -1577,8 +1575,6 @@ function Calendar() {
     </>
   );
 }
-const channelLabel = (c: Channel) =>
-  ({ sms: "SMS", email: "Email", push: "Push" })[c];
 function Reminders() {
   const { s, go, busy, act, toast } = useUI();
   const [view, setView] = useState("upcoming");
@@ -1605,7 +1601,7 @@ function Reminders() {
     <>
       <PageHeading
         title="A gentle nudge, right on time."
-        description="Your reminders, and how they’re getting on."
+        description="Your email reminders, and how they’re getting on."
         action={false}
       />
       <div className="filters">
@@ -1634,13 +1630,7 @@ function Reminders() {
             return (
               <article key={r.id} className="reminder-row">
                 <span className="reminder-icon">
-                  {r.channel === "sms" ? (
-                    <Smartphone size={21} />
-                  ) : r.channel === "email" ? (
-                    <Mail size={21} />
-                  ) : (
-                    <Bell size={21} />
-                  )}
+                  <Mail size={21} />
                 </span>
                 <div className="grow">
                   <button
@@ -1658,7 +1648,7 @@ function Reminders() {
                     · {s.profile.timezone}
                   </p>
                   <div className="row wrap">
-                    <span className="pill">{channelLabel(r.channel)}</span>
+                    <span className="pill">Email</span>
                     <span
                       className={`pill ${r.state === "delivered" ? "green" : r.state === "failed" ? "red" : ""}`}
                     >
@@ -1687,7 +1677,7 @@ function Reminders() {
                 {r.state === "pending" && (
                   <button
                     className="icon-button"
-                    aria-label={`Cancel ${channelLabel(r.channel)} reminder for ${d.name}`}
+                    aria-label={`Cancel email reminder for ${d.name}`}
                     disabled={busy}
                     onClick={() => void cancel(r.id)}
                   >
@@ -1718,8 +1708,8 @@ function Reminders() {
       </section>
       <p className="footnote">
         <Clock size={15} />
-        “Accepted” means the delivery provider received the request. SMS
-        delivery confirmations appear when the carrier reports them.
+        “Accepted” means the email provider received the request. It does not
+        confirm inbox delivery or that the email was read.
       </p>
     </>
   );
@@ -1736,15 +1726,8 @@ function SettingsPage({
   const { s, demo, busy, act, toast, open } = useUI();
   const [p, setP] = useState(s.profile),
     [error, setError] = useState(""),
-    [phone, setPhone] = useState(
-      session?.user.phone ? "+" + session.user.phone.replace(/^\+/, "") : "",
-    ),
-    [code, setCode] = useState(""),
-    [sent, setSent] = useState(false),
-    [verified, setVerified] = useState(!!session?.user.phone_confirmed_at),
     [authBusy, setAuthBusy] = useState(false),
-    [password, setPassword] = useState(""),
-    [device, setDevice] = useState(false);
+    [password, setPassword] = useState("");
   const zones = [
     ...new Set([
       s.profile.timezone,
@@ -1752,13 +1735,6 @@ function SettingsPage({
       ...Intl.supportedValuesOf("timeZone"),
     ]),
   ];
-  useEffect(() => {
-    if (pushSupported())
-      void navigator.serviceWorker
-        .getRegistration()
-        .then((r) => r?.pushManager.getSubscription())
-        .then((sub) => setDevice(!!sub));
-  }, []);
   const update = <K extends keyof Profile>(key: K, value: Profile[K]) =>
     setP({ ...p, [key]: value });
   async function save(e: FormEvent) {
@@ -1771,77 +1747,12 @@ function SettingsPage({
         p_theme: p.theme,
         p_private: p.private_content,
         p_email: p.email_enabled,
-        p_sms: p.sms_enabled,
-        p_push: p.push_enabled,
+        p_sms: false,
+        p_push: false,
       });
       toast("Preferences saved.");
     } catch (e) {
       setError((e as Error).message);
-    }
-  }
-  async function sendCode() {
-    setAuthBusy(true);
-    setError("");
-    try {
-      if (demo)
-        throw new Error("Phone verification needs a connected account.");
-      if (!/^\+[1-9]\d{7,14}$/.test(phone))
-        throw new Error("Use international format, e.g. +12025550123.");
-      const { error } = await supabase!.auth.updateUser({
-        phone: phone.replace(/^\+/, ""),
-      });
-      if (error) throw error;
-      setSent(true);
-      setVerified(false);
-      update("sms_enabled", false);
-      toast("Verification code sent to your phone.");
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setAuthBusy(false);
-    }
-  }
-  async function verify() {
-    setAuthBusy(true);
-    setError("");
-    try {
-      const { error } = await supabase!.auth.verifyOtp({
-        phone: phone.replace(/^\+/, ""),
-        token: code,
-        type: "phone_change",
-      });
-      if (error) throw error;
-      setVerified(true);
-      setSent(false);
-      toast("Phone verified. You can now opt in to SMS reminders.");
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setAuthBusy(false);
-    }
-  }
-  async function devicePush() {
-    setAuthBusy(true);
-    setError("");
-    try {
-      if (demo)
-        throw new Error(
-          "Device notifications need a connected account. No notifications are sent in the demo.",
-        );
-      if (device) {
-        await disablePush();
-        setDevice(false);
-        toast("Notifications disconnected on this device.");
-      } else {
-        await enablePush();
-        setDevice(true);
-        update("push_enabled", true);
-        toast("Notifications enabled on this device.");
-      }
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setAuthBusy(false);
     }
   }
   async function changePassword(e: FormEvent) {
@@ -1933,7 +1844,8 @@ function SettingsPage({
           <section className="panel form-section">
             <h2>Reminder preferences</h2>
             <p className="muted">
-              Choose your channels. Schedule reminders beside each installment.
+              Schedule email reminders beside each installment. Turn them off
+              here to cancel pending emails.
             </p>
             <label className="toggle-row">
               <span>
@@ -1948,39 +1860,8 @@ function SettingsPage({
             </label>
             <label className="toggle-row">
               <span>
-                <b>Push notifications</b>
-                <small>Allow reminders across subscribed devices.</small>
-              </span>
-              <input
-                type="checkbox"
-                checked={p.push_enabled}
-                onChange={(e) => update("push_enabled", e.target.checked)}
-              />
-            </label>
-            <div className="device-row">
-              <p className="small muted">
-                {device
-                  ? "This device is subscribed."
-                  : "Subscribe this device for push reminders."}{" "}
-                On iPhone, first add Duewell to your Home Screen.
-              </p>
-              <button
-                type="button"
-                className="secondary"
-                disabled={authBusy}
-                onClick={() => void devicePush()}
-              >
-                <Bell size={17} />
-                {device ? "Disconnect this device" : "Enable on this device"}
-              </button>
-            </div>
-            <label className="toggle-row">
-              <span>
-                <b>Keep notification details private</b>
-                <small>
-                  Hide debt names and amounts in messages and on the lock
-                  screen.
-                </small>
+                <b>Keep email details private</b>
+                <small>Hide debt names and amounts in reminder emails.</small>
               </span>
               <input
                 type="checkbox"
@@ -1988,81 +1869,6 @@ function SettingsPage({
                 onChange={(e) => update("private_content", e.target.checked)}
               />
             </label>
-            <div className="sms-section">
-              <h3>Text reminders</h3>
-              <p className="muted small">
-                Verify a number you own before enabling SMS.
-              </p>
-              <Field
-                label="Phone number"
-                hint="International format, e.g. +12025550123."
-              >
-                <input
-                  type="tel"
-                  autoComplete="tel"
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value);
-                    setVerified(false);
-                    update("sms_enabled", false);
-                  }}
-                />
-              </Field>
-              <button
-                type="button"
-                className="ghost"
-                disabled={authBusy || demo}
-                onClick={() => void sendCode()}
-              >
-                {sent
-                  ? "Resend verification code"
-                  : verified
-                    ? "Verify a new number"
-                    : "Send verification code"}
-              </button>
-              {sent && (
-                <div className="verification">
-                  <Field label="Verification code">
-                    <input
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      value={code}
-                      maxLength={10}
-                      onChange={(e) => setCode(e.target.value)}
-                    />
-                  </Field>
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={authBusy || !code}
-                    onClick={() => void verify()}
-                  >
-                    Verify phone
-                  </button>
-                </div>
-              )}
-              {verified && (
-                <p className="success small">
-                  <Check size={16} />
-                  Phone verified
-                </p>
-              )}
-              <label className="consent">
-                <input
-                  type="checkbox"
-                  disabled={!verified && !demo}
-                  checked={p.sms_enabled}
-                  onChange={(e) => update("sms_enabled", e.target.checked)}
-                />
-                <span>
-                  I agree to receive the Duewell payment reminders I schedule at
-                  my verified number. Frequency depends on my schedule. Message
-                  and data rates may apply. Reply STOP to opt out or HELP for
-                  help. SMS consent is optional and isn’t required to use
-                  Duewell.
-                </span>
-              </label>
-            </div>
           </section>
           <button className="primary" disabled={busy || authBusy}>
             {busy ? "Saving…" : "Save preferences"}
@@ -2347,21 +2153,13 @@ function PaymentForm({ id, close }: { id: string; close: () => void }) {
   );
 }
 function ReminderForm({ id, close }: { id: string; close: () => void }) {
-  const { s, demo, busy, act, toast } = useUI();
+  const { s, email, demo, busy, act, toast } = useUI();
   const i = s.installments.find((i) => i.id === id)!,
     d = s.debts.find((d) => d.id === i.debt_id)!;
   const current = s.reminders.filter(
     (r) => r.installment_id === id && r.active,
   );
-  const [channel, setChannel] = useState(
-      current.some((r) => r.channel === "sms")
-        ? current.some((r) => r.channel === "email")
-          ? "both"
-          : "sms"
-        : "email",
-    ),
-    [push, setPush] = useState(current.some((r) => r.channel === "push")),
-    [offsets, setOffsets] = useState<number[]>(
+  const [offsets, setOffsets] = useState<number[]>(
       current.length ? [...new Set(current.map((r) => r.days_before))] : [1],
     ),
     [time, setTime] = useState(current[0]?.send_time.slice(0, 5) || "09:00"),
@@ -2369,18 +2167,12 @@ function ReminderForm({ id, close }: { id: string; close: () => void }) {
   async function submit(e: FormEvent) {
     e.preventDefault();
     try {
-      const channels: Channel[] =
-        channel === "both"
-          ? ["email", "sms"]
-          : channel === "none"
-            ? []
-            : [channel as Channel];
-      if (push || channel === "none") channels.push("push");
-      if (!channels.length) throw new Error("Choose at least one channel.");
+      if (!s.profile.email_enabled)
+        throw new Error("Enable email reminders in Settings first.");
       if (!offsets.length) throw new Error("Choose at least one reminder day.");
       await act("set_reminders", {
         p_installment: id,
-        p_channels: channels,
+        p_channels: ["email"],
         p_offsets: offsets,
         p_time: time,
       });
@@ -2399,27 +2191,23 @@ function ReminderForm({ id, close }: { id: string; close: () => void }) {
       <p className="muted">
         {d.name} · {money(remaining(s, i))} due {formatDate(i.due_date)}
       </p>
-      <Field label="Send my reminder by">
-        <select value={channel} onChange={(e) => setChannel(e.target.value)}>
-          <option value="email">Email</option>
-          <option value="sms">SMS</option>
-          <option value="both">Email + SMS</option>
-          <option value="none">Push only</option>
-        </select>
+      <Field
+        label="Send my reminder by"
+        hint="Sent to your verified account email."
+      >
+        <div className="email-destination">
+          <Mail size={20} aria-hidden="true" />
+          <div>
+            <b>Email</b>
+            <span>{email}</span>
+          </div>
+        </div>
       </Field>
-      <label className="checkbox-row">
-        <input
-          type="checkbox"
-          checked={push || channel === "none"}
-          disabled={channel === "none"}
-          onChange={(e) => setPush(e.target.checked)}
-        />
-        Also send a push notification
-      </label>
-      <p className="muted small">
-        Enable channels and verify your phone in Settings before scheduling. No
-        SMS is sent without your opt-in.
-      </p>
+      {!s.profile.email_enabled && (
+        <p className="small muted" role="status">
+          Email reminders are off. Enable them in Settings before scheduling.
+        </p>
+      )}
       <fieldset>
         <legend>When would you like a nudge?</legend>
         <div className="offset-options">
@@ -2462,7 +2250,7 @@ function ReminderForm({ id, close }: { id: string; close: () => void }) {
         <button type="button" className="ghost" onClick={close} disabled={busy}>
           Cancel
         </button>
-        <button className="primary" disabled={busy}>
+        <button className="primary" disabled={busy || !s.profile.email_enabled}>
           {busy ? "Scheduling…" : "Save reminder"}
         </button>
       </div>

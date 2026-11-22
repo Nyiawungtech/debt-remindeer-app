@@ -3,25 +3,26 @@
 ## Deployed
 
 - Supabase project: `motuhpcynixmorwolnlv`, Duewell, US East, free-plan organization.
-- Four migrations: debt/account schema, worker RPCs, delivery protection/indexes, minute scheduler.
-- All six public application tables use RLS. Browser mutations use invoker API wrappers with narrow, ownership-checked implementations in the unexposed `duewell_private` schema.
-- Existing session membership and MFA assurance are enforced server-side.
-- Edge Functions: `reminder-worker`, `twilio-webhook`, `account` (active).
-- Encrypted Vault runtime configuration, generated VAPID identity, and an authenticated Cron job.
-- Client configuration points to the live project; only public publishable and VAPID keys ship in the frontend.
+- Five migrations, including `20261122224735_duewell_email_only.sql`.
+- All six public tables use RLS. Client mutations use invoker API wrappers with narrow, ownership-checked implementations in the unexposed `duewell_private` schema. Session membership and MFA assurance are enforced in the database.
+- Email-only `reminder-worker` version 2 and `account` are active. The older Twilio callback remains deployed but dormant; SMS and push registration/scheduling are blocked.
+- Encrypted runtime settings and the authenticated `duewell-reminder-dispatch` Cron job run every minute. The active configuration allowlist excludes SMS and push credentials.
+- Frontend public configuration points to the live project. No provider secrets or VAPID identity are required by the browser.
 
 ## Verified
 
-29 automated checks, a production build, and Deno checks passed locally and in GitHub Actions. Live database smoke tests confirmed owner isolation, duplicate-payment protection, overpayment prevention, blocked cross-account mutations, and server-only delivery settings. Every synthetic row was rolled back.
+36 automated tests, a production build and Deno checks passed locally. GitHub Actions runs the same checks for the branch. Tests cover owner isolation, payment idempotency and overpayment prevention, email scheduling/time zones/opt-out, deferred-channel rejection, server-only settings, Resend request idempotency/privacy, conservative retry behavior and PWA cache boundaries.
 
-Live HTTP checks rejected anonymous debt reads, unauthenticated worker calls, unsigned Twilio callbacks and account operations without a user token. The server-side scheduler invoked the worker with HTTP 200, with zero accepted/skipped/failed jobs because no users or reminders had been created. Supabase security advisors reported no notices; performance advisors only noted indexes unused on the new, empty database.
+Live transactional smoke tests passed against hosted Supabase, including email scheduling, email opt-out, SMS/push rejection, payment protection and cross-account access rejection. All synthetic users, sessions and application rows were rolled back. Security advisors reported no notices. Performance advisors only reported unused indexes on the new database; retain these until real workload data is available ([advisor explanation](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index)).
 
-Earlier desktop/390px browser QA covered partial payments, email + SMS schedule entry using sample data, month-end installment generation, fixed headers, and dark theme. These browser checks did not send real messages.
+The minute scheduler invoked the updated worker with HTTP 200 and `{accepted:0,skipped:0,failed:0}`. No messages were sent. There were no real profiles or active non-email jobs at verification.
+
+Desktop and 390px browser QA confirmed email-only preferences, the verified email destination, reminder timing controls and saving an email reminder using clearly labeled sample data. Earlier QA covered partial payments, month-end schedules, fixed headers and dark theme. Demo checks do not prove inbox delivery.
 
 ## Still required before public launch
 
-The user has not created Twilio or email provider accounts. SMS delivery, phone verification, reminder email and production Auth SMTP are not activated. Email/password signup is enabled in Supabase and email confirmation is required, but public email onboarding/redirects/password settings still need production configuration and verification. No real signup or actual push/SMS/email receipt is claimed.
+The user has created a Resend account. Its sending API key and sender address have not yet been added to Vault (`duewell_resend_api_key`, `duewell_email_from`). Domain verification and actual email receipt remain unverified. Reminder email is not activated; SMS and push are intentionally paused.
 
-The application has no public HTTPS frontend deployment yet. Vault `APP_URL` currently points to the local review origin. Update it and Supabase Auth URLs to the final frontend origin before public use. Keep the VAPID identity stable when deploying; its private key stays in Vault.
+The frontend has no public HTTPS deployment yet. Vault `APP_URL` points to the local review origin. Set the final origin in Vault, frontend configuration and Supabase Auth. Configure production Auth SMTP, confirmation/reset redirects and password settings, then test real onboarding. Reminder API configuration does not automatically configure Auth SMTP.
 
-GitHub access is working. The complete application source is published on `codex/duewell-pwa`, with draft pull request https://github.com/Nyiawungtech/debt-remindeer-app/pull/1 targeting `main`. It remains a draft pending the production activation steps above.
+The source is published on `codex/duewell-pwa`, with [draft pull request #1](https://github.com/Nyiawungtech/debt-remindeer-app/pull/1) targeting `main`. Keep it a draft until production activation and actual inbox receipt are verified. See [deployment steps](DEPLOYMENT.md) for the exact setup.

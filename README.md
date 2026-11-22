@@ -7,8 +7,8 @@ A responsive debt reminder PWA built with **Ionic React, TypeScript, Vite and Su
 - Sign up, email confirmation, login, password recovery, password changes, optional TOTP MFA, logout, export and account deletion.
 - Owner-isolated debts, custom or equal installments, anchored monthly schedules, full/partial payments, reversal history and installment edits.
 - Dashboard periods, remaining balance, money-based progress, active/completed debts, search, calendar, and context-aware empty states.
-- Email / SMS / both reminders, optional Web Push, verified phone ownership and explicit SMS consent.
-- Server-side scheduling, worker leases, conservative retries, Twilio signed status/STOP webhooks, provider status history, and privacy-first reminder content.
+- Email-only reminders to the verified account address, with per-installment timing and account-wide opt-out.
+- Server-side scheduling, worker leases, Resend idempotency keys, conservative retries, provider status history, and private reminder content by default.
 - Install manifest, generated app icons, service worker, offline fallback, theme settings, fixed header, desktop sidebar and mobile navigation.
 
 Payments happen with the lender. **Mark as paid** only updates the tracker. USD is the initial supported currency. No bank account connection or payment processing is included.
@@ -23,7 +23,7 @@ npm run dev
 
 Without the public Supabase configuration, the app displays login plus an explicitly labeled, in-memory interactive demo. **The demo does not create accounts, save real data or send reminders.** A successful frontend build is not evidence that any external delivery provider is connected.
 
-For real accounts, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. For Web Push also set the public VAPID key. Secret provider credentials belong exclusively in Supabase Edge Function secrets.
+For real accounts, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. Secret provider credentials belong exclusively in Supabase Vault or Edge Function secrets.
 
 ## Verify
 
@@ -39,7 +39,7 @@ Node 24 is used in CI. The lockfile pins dependency resolution. Deno is a develo
 
 The Duewell Supabase project is `motuhpcynixmorwolnlv` (US East). Its database migrations, three Edge Functions, encrypted runtime settings and minute scheduler are deployed. The client example configuration contains only public keys.
 
-A live transactional smoke test verified owner isolation, payment idempotency, overpayment prevention and server-only access to delivery configuration; synthetic records were rolled back. The scheduler successfully invoked the worker with HTTP 200 and no messages sent. Public Auth settings, production email/SMS providers, frontend HTTPS hosting and real device delivery still need activation/acceptance.
+A live transactional smoke test verified owner isolation, payment idempotency, overpayment prevention and server-only access to delivery configuration; synthetic records were rolled back. The scheduler successfully invoked the worker with HTTP 200 and no messages sent. Public Auth settings, Resend sending credentials, frontend HTTPS hosting and actual inbox receipt still need activation/acceptance. SMS and push reminders are paused in both the UI and backend.
 
 ## Connect and ship
 
@@ -47,15 +47,15 @@ Follow [deployment instructions](docs/DEPLOYMENT.md). They cover the database mi
 
 Source layout:
 
-| Path                    | Purpose                                                      |
-| ----------------------- | ------------------------------------------------------------ |
-| `src/App.tsx`           | PWA screens and forms                                        |
-| `src/lib/domain.ts`     | Exact money, dates, periods and financial rules              |
-| `src/lib/workspace.ts`  | Authenticated database actions and isolated sample workspace |
-| `supabase/migrations/`  | Schema, RLS and transactional financial/worker RPCs          |
-| `supabase/functions/`   | Dispatch worker, Twilio webhooks and account deletion        |
-| `supabase/schedule.sql` | Vault-backed minute scheduler setup                          |
-| `public/sw.js`          | Public asset caching, offline fallback and Web Push handling |
-| `tests/`                | Behavioral and database security tests                       |
+| Path                    | Purpose                                                                    |
+| ----------------------- | -------------------------------------------------------------------------- |
+| `src/App.tsx`           | PWA screens and forms                                                      |
+| `src/lib/domain.ts`     | Exact money, dates, periods and financial rules                            |
+| `src/lib/workspace.ts`  | Authenticated database actions and isolated sample workspace               |
+| `supabase/migrations/`  | Schema, RLS and transactional financial/worker RPCs                        |
+| `supabase/functions/`   | Email dispatch worker and account deletion (legacy SMS webhook is dormant) |
+| `supabase/schedule.sql` | Vault-backed minute scheduler setup                                        |
+| `public/sw.js`          | Public asset caching and offline fallback                                  |
+| `tests/`                | Behavioral and database security tests                                     |
 
-This implementation has not undergone an independent security audit. Production delivery must be verified with your actual Supabase, SMS, email and push configuration before inviting public users.
+This implementation has not undergone an independent security audit. Production delivery must be verified with your actual Supabase, email and hosting configuration before inviting public users.

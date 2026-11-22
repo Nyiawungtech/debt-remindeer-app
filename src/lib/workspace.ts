@@ -17,6 +17,7 @@ async function fetchSnapshot(): Promise<Snapshot> {
     tables.map((table) =>
       collectPages(async (after) => {
         let query = supabase!.from(table).select("*").order("id").limit(1000);
+        if (table === "reminders") query = query.eq("channel", "email");
         if (after) query = query.gt("id", after);
         const { data, error } = await query;
         if (error) throw new Error(error.message);
@@ -186,17 +187,32 @@ export function useWorkspace(session: Session | null, demo: boolean) {
           break;
         }
         case "save_preferences":
+          if (a.p_sms || a.p_push)
+            throw new Error("Only email reminders are available right now.");
+          for (const r of next.reminders)
+            if (
+              r.state === "pending" &&
+              (a.p_timezone !== next.profile.timezone || !a.p_email)
+            ) {
+              r.state = "cancelled";
+              r.active = false;
+              r.error_code = "preferences_changed";
+            }
           Object.assign(next.profile, {
             display_name: a.p_name,
             timezone: a.p_timezone,
             theme: a.p_theme,
             private_content: a.p_private,
             email_enabled: a.p_email,
-            sms_enabled: a.p_sms,
-            push_enabled: a.p_push,
+            sms_enabled: false,
+            push_enabled: false,
           });
           break;
         case "set_reminders": {
+          if (a.p_channels?.length !== 1 || a.p_channels[0] !== "email")
+            throw new Error("Only email reminders are available right now.");
+          if (!next.profile.email_enabled)
+            throw new Error("Enable email reminders in Settings first.");
           const i = next.installments.find((i) => i.id === a.p_installment)!;
           const rows = [];
           for (const c of a.p_channels as Channel[])

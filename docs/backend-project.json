@@ -5,5 +5,7 @@
   "api_url": "https://motuhpcynixmorwolnlv.supabase.co",
   "frontend_public": false,
   "sms_provider_configured": false,
-  "email_provider_configured": false
+  "email_provider_configured": false,
+  "enabled_channels": ["email"],
+  "deferred_channels": ["sms", "push"]
 }

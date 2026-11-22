@@ -14,7 +14,6 @@ export const supabase = configured
     })
   : null;
 export const appUrl = import.meta.env.VITE_APP_URL || location.origin;
-export const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || "";
 export async function rpc<T>(
   name: string,
   args: Record<string, unknown> = {},

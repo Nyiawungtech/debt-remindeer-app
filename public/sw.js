@@ -1,5 +1,5 @@
 /* Cache public assets only. Never store authentication, API responses or debt data. */
-const CACHE = "duewell-shell-v1";
+const CACHE = "duewell-shell-v2";
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -23,7 +23,17 @@ self.addEventListener("activate", (event) => {
           keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)),
         ),
       )
-      .then(() => self.clients.claim()),
+      .then(async () => {
+        // Retire existing device subscriptions when upgrading to email-only.
+        try {
+          const subscription =
+            await self.registration.pushManager?.getSubscription();
+          if (subscription) await subscription.unsubscribe();
+        } catch {
+          /* Email delivery does not depend on browser push support. */
+        }
+        await self.clients.claim();
+      }),
   );
 });
 self.addEventListener("message", (event) => {
@@ -61,46 +71,5 @@ self.addEventListener("fetch", (event) => {
           return response;
         }),
     ),
-  );
-});
-self.addEventListener("push", (event) => {
-  let data = {};
-  try {
-    data = event.data?.json() || {};
-  } catch {}
-  const target =
-    typeof data.url === "string" && data.url.startsWith("/#")
-      ? data.url
-      : "/#reminders";
-  event.waitUntil(
-    self.registration.showNotification(data.title || "Duewell reminder", {
-      body:
-        data.body || "You have a payment coming up. Open Duewell to review it.",
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      tag: data.tag || "duewell-reminder",
-      data: { url: target },
-    }),
-  );
-});
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  const url = new URL(
-    event.notification.data?.url || "/#reminders",
-    self.location.origin,
-  ).href;
-  event.waitUntil(
-    self.clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then(async (windows) => {
-        const client = windows.find(
-          (c) => new URL(c.url).origin === self.location.origin,
-        );
-        if (client) {
-          await client.navigate(url);
-          return client.focus();
-        }
-        return self.clients.openWindow(url);
-      }),
   );
 });
