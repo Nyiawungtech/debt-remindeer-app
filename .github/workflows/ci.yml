@@ -13,5 +13,27 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Use the public frontend configuration
+        run: cp .env.example .env.production
       - run: npm run build
       - run: npm run backend:check
+      - name: Recover the static release
+        run: |
+          node --input-type=module <<'NODE'
+          import { readdir, readFile } from "node:fs/promises";
+          import { createHash } from "node:crypto";
+          async function walk(dir) {
+            const entries = await readdir(dir, { withFileTypes: true });
+            return (await Promise.all(entries.map(item => item.isDirectory() ? walk(dir + "/" + item.name) : [dir + "/" + item.name]))).flat();
+          }
+          for (const file of await walk("dist")) {
+            const data = await readFile(file);
+            const sha = createHash("sha1").update("blob " + data.length + "\0").update(data).digest("hex");
+            const path = file.slice(5);
+            console.log("SETTLEUP_FILE " + JSON.stringify({ path, sha, size: data.length }));
+            const payload = data.toString("base64");
+            for (let offset = 0; offset < payload.length; offset += 12000) {
+              console.log("SETTLEUP_DATA " + JSON.stringify({ path, offset, data: payload.slice(offset, offset + 12000) }));
+            }
+          }
+          NODE
