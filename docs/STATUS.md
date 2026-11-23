@@ -52,6 +52,13 @@ Updated November 23, 2026 (America/New_York).
 - The workspace disconnected during artifact upload. GitHub's read-only runner rebuilt the same `04f104d6895df145` release with the committed public frontend configuration; its tests, build and Deno checks passed. The recovered release tree was verified across all 49 files before publishing. The temporary payload-log export was removed after recovery. CI keeps the public build configuration step.
 - The frontend is published on `release/hostinger` at `571de2b92d0f201687b37393480ee4c3db2d2b3c`. Reminder worker v5 and database/security settings were unchanged.
 
+## Latest live verification
+
+- GitHub push run `45136072776` passed all 51 tests, the production build, Deno checks and the opt-in live deployment check. Live release `04f104d6895df145` was confirmed on Hostinger.
+- `/add`, `/confirm-email` and `/privacy` returned the exact expected app shell with CSP. All 28 public precache assets were checked; code/font/text assets and the service worker matched the build bytes. The PNG icons returned valid PNGs with the expected 192, 512, maskable 512 and Apple 180 dimensions; their encodings differed from the build, so pixel identity was not asserted.
+- The live check is available through `scripts/verify-live.mjs` after building with the public frontend configuration. CI runs it only on a push commit whose message contains `[verify-live]`, after a release has been published. It uses no account credentials and sends no reminders.
+- Preview layout checks were completed before the browser/workspace connection dropped. No live browser rerender or physical iPhone check was possible afterward; live HTTP/build verification succeeded through the read-only runner.
+
 ## Acceptance still pending
 
 - Owner signup, confirmation and password recovery using the production app and the owner’s chosen credentials.
