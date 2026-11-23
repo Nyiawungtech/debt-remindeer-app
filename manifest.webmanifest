@@ -31,11 +31,11 @@
   "shortcuts": [
     {
       "name": "Add a debt",
-      "url": "/#add"
+      "url": "/add"
     },
     {
       "name": "Upcoming payments",
-      "url": "/#calendar"
+      "url": "/calendar"
     }
   ]
 }
