@@ -10,6 +10,7 @@ import "@fontsource/dm-sans/latin-700.css";
 import "@fontsource/manrope/latin-600.css";
 import "@fontsource/manrope/latin-700.css";
 import "./styles.css";
+import "./motion.css";
 setupIonicReact({ mode: "md" });
 class AppBoundary extends React.Component<
   { children: React.ReactNode },
