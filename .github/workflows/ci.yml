@@ -17,3 +17,6 @@ jobs:
         run: cp .env.example .env.production
       - run: npm run build
       - run: npm run backend:check
+      - name: Verify the published release
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[verify-live]')
+        run: node scripts/verify-live.mjs
