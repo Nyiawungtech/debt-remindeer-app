@@ -1,0 +1,41 @@
+{
+  "id": "/",
+  "name": "SettleUp \u2014 Debt & Payment Reminders",
+  "short_name": "SettleUp",
+  "description": "Keep every payment in view with email and device reminders.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f7fa",
+  "theme_color": "#7058d2",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add a debt",
+      "url": "/add"
+    },
+    {
+      "name": "Upcoming payments",
+      "url": "/calendar"
+    }
+  ]
+}
