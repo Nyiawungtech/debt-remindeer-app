@@ -6,14 +6,14 @@ Updated November 22, 2026 (America/New_York).
 
 - Public app: https://settleupapp.cloud/ on the existing Hostinger Premium plan. Git deployment reports completed.
 - Connected repository: Nyiawungtech/debt-remindeer-app, selected repository only. Hostinger’s required administration/code/pull-request write permissions were explicitly approved by the owner.
-- Static deployment branch: `release/hostinger`, release commit `e33651268cadd7e70a83dcf3936f41e76e4d8145`, build `57f202d6950cc074`, version `0.2.0-beta`. The 37-file release tree was verified against the local build before publishing; prior hashed assets remain available for open sessions.
+- Static deployment branch: `release/hostinger`, release commit `79c45986989635c6e922a8e1e2170a73061126dd`, build `e577f9bb46e86c95`, version `0.2.0-beta`. The 43-file release tree was verified against the local build before publishing; prior hashed assets remain available for open sessions.
 - Source branch: `codex/duewell-pwa`, draft pull request #1. Keep the acceptance limits below visible before wider promotion.
 - Support: `support@settleupapp.cloud` is an active alias of the existing `reminders@settleupapp.cloud` mailbox. No new mailbox purchase was needed. Unrelated hosted websites were not modified.
 
 ## Backend and authentication
 
 - Supabase `motuhpcynixmorwolnlv`, US East: six applied migrations, RLS on all six public tables, invoker API wrappers and narrow ownership-checked implementations.
-- Worker v4 handles email and Web Push. Five jobs are processed concurrently per invocation, at most three device sends per job at once, with minute scheduling and conservative retries. SMS remains deferred.
+- Worker v5 handles email and Web Push. Five jobs are processed concurrently per invocation, at most three device sends per job at once, with minute scheduling and conservative retries. SMS remains deferred.
 - Stable VAPID identity, restricted Resend key, sender `SettleUp <reminders@settleupapp.cloud>` and canonical app URL are stored in encrypted Vault. No server secrets are in the frontend or source repository.
 - Production Auth URL/redirects and custom Resend SMTP are configured. Confirmed email, a visually verified 12-character minimum password, secure email/password changes and optional TOTP protect accounts. Password/email changes and MFA enrollment/removal trigger security emails.
 - Confirmation and recovery messages use SettleUp branding. PKCE links must be opened in the browser that requested them.
@@ -21,7 +21,7 @@ Updated November 22, 2026 (America/New_York).
 
 ## Verified
 
-- 42 automated tests pass: PostgreSQL ownership and money invariants through PGlite, reminder channels/opt-out, provider errors/privacy, encrypted VAPID request construction, pagination and service-worker cache/URL boundaries.
+- 47 automated tests pass: PostgreSQL ownership and money invariants through PGlite, reminder channels/opt-out, provider errors/privacy, encrypted VAPID request construction, pagination and service-worker cache/URL boundaries.
 - TypeScript/Vite production build and Deno checks pass. GitHub Actions passed on the published source. Live transactional checks passed with all synthetic account/financial data rolled back. Supabase security advisors reported no notices.
 - Live HTTPS root returns 200. HTTP and www redirect to the canonical HTTPS origin. CSP, HSTS, nosniff, manifest MIME and no-cache HTML/manifest/service-worker headers were confirmed. Service-Worker-Allowed is `/`.
 - Live release.json and service-worker cache version match the tested build. All 28 precache assets returned 200; PNG dimensions were correct for 192, 512, maskable and Apple touch icons.
@@ -34,6 +34,14 @@ Updated November 22, 2026 (America/New_York).
 - Added staggered page/card entrances, animated progress fills, tactile button and navigation feedback, spring-style dialogs, toast entrances and gentle auth-page motion. Existing layout and financial behavior are unchanged.
 - Motion is enabled only when the device has not requested reduced motion. Keyboard focus cancels card entrances immediately. No new dependencies were added; the compressed CSS increase is about 1.4 KB.
 - Production build and both GitHub Actions runs passed on source commit `aed958e51e8e67cbf5e19741fe38169115788566`. Preview payment dialog opening, Escape dismissal and focus restoration were checked. The live release manifest and new CSS were verified after automatic Hostinger deployment.
+
+## Mobile date and clean URL update
+
+- Mobile installment rows now give the date a full-width labeled field, retain 16px input text and provide a 44px remove control. Tapping anywhere in a date input opens the native picker when supported; native keyboard/picker fallback remains available.
+- App navigation uses history paths such as `/add`, `/debts` and `/debt/<id>`. Old hash bookmarks migrate in place without dropping PKCE query parameters. Auth fragments and the accessibility anchor are preserved. Public policy links, PWA shortcuts, email links and notification destinations use clean paths. The worker continues accepting old notification destinations safely.
+- Source commit `23db89dee4e60169f7729df2f61f0468b3588d4a` passed both GitHub Actions runs. All 47 local tests, the production build and Deno checks passed. Browser checks covered date selection and saving a generated $200 sample schedule, Back/Forward navigation and policy links without losing demo state. No real financial records were created.
+- Live `/add`, `/debts` and `/privacy` return the new app bundle with no-cache and CSP headers. The release manifest matches build `e577f9bb46e86c95`; shortcuts use clean paths. Worker v5 was retrieved after deployment and all files matched the intended release, with its existing authentication unchanged.
+- Owner signup visibility and the proposed Capacitor milestone are documented in `docs/ADMIN_AND_MOBILE.md`. No in-app administrator role or native mobile project was added.
 
 ## Acceptance still pending
 
