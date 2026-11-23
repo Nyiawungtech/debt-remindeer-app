@@ -3,7 +3,7 @@
   "name": "SettleUp",
   "region": "us-east-1",
   "api_url": "https://motuhpcynixmorwolnlv.supabase.co",
-  "frontend_public": false,
+  "frontend_public": true,
   "sms_provider_configured": false,
   "email_provider_configured": true,
   "enabled_channels": [
@@ -23,7 +23,14 @@
   "release_build": "20743a39b5ede68b",
   "release_branch": "release/hostinger",
   "release_commit": "be5db0ef73c89a9bae8a5bf6cebcb821fd757cd9",
-  "deployment_status": "awaiting_hostinger_github_connection_approval",
-  "signup_and_device_delivery_test": "pending_owner_acceptance",
-  "auth_security_emails_enabled": true
+  "deployment_status": "live_beta",
+  "signup_and_device_delivery_test": "pending_owner_signup_and_receipt",
+  "auth_security_emails_enabled": true,
+  "frontend_url": "https://settleupapp.cloud/",
+  "hostinger_repository_connected": true,
+  "deployment_verified": true,
+  "live_release_build": "20743a39b5ede68b",
+  "public_assets_verified": 28,
+  "physical_mobile_device_test": "pending",
+  "live_offline_reload_test": "not_performed_browser_devtools_restricted"
 }
