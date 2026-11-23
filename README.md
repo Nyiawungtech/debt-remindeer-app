@@ -39,7 +39,7 @@ Node 24 is used in CI. The lockfile pins dependency resolution. Deno is a develo
 
 The Duewell Supabase project is `motuhpcynixmorwolnlv` (US East). Its database migrations, three Edge Functions, encrypted runtime settings and minute scheduler are deployed. The client example configuration contains only public keys.
 
-A live transactional smoke test verified owner isolation, payment idempotency, overpayment prevention and server-only access to delivery configuration; synthetic records were rolled back. The scheduler successfully invoked the worker with HTTP 200 and no messages sent. Public Auth settings, Resend sending credentials, frontend HTTPS hosting and actual inbox receipt still need activation/acceptance. SMS and push reminders are paused in both the UI and backend.
+A live transactional smoke test verified owner isolation, payment idempotency, overpayment prevention and server-only access to delivery configuration; synthetic records were rolled back. The scheduler successfully invoked the worker with HTTP 200 and no queued messages. Resend now verifies `settleupapp.cloud`; its domain-restricted sending key and sender address are stored in encrypted Vault settings. One owner-approved setup email was accepted and reported delivered by Resend. Public Auth SMTP/redirects, frontend HTTPS hosting and signup-to-scheduled-reminder acceptance still need activation/verification. SMS and push reminders are paused in both the UI and backend.
 
 ## Connect and ship
 

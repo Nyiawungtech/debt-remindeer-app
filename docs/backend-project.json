@@ -5,7 +5,11 @@
   "api_url": "https://motuhpcynixmorwolnlv.supabase.co",
   "frontend_public": false,
   "sms_provider_configured": false,
-  "email_provider_configured": false,
+  "email_provider_configured": true,
   "enabled_channels": ["email"],
-  "deferred_channels": ["sms", "push"]
+  "deferred_channels": ["sms", "push"],
+  "sending_domain": "settleupapp.cloud",
+  "email_domain_verified": true,
+  "email_from": "Duewell <reminders@settleupapp.cloud>",
+  "email_provider_test": "delivered"
 }

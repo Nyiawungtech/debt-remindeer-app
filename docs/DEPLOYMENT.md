@@ -14,6 +14,8 @@ Configure production Auth SMTP separately from reminder delivery. Resend can sup
 
 ## 2. Resend email
 
+The existing integration is configured: `settleupapp.cloud` is verified, the sender is `Duewell <reminders@settleupapp.cloud>`, and the domain-restricted sending key is stored in encrypted Vault settings. One owner-approved setup email was reported delivered by Resend. Keep the current key when deploying the frontend; use the following steps for a fresh setup or intentional credential rotation.
+
 1. Add your sending domain in Resend and publish its required DNS records. Wait for domain verification.
 2. Create an API key with permission to send email from that domain.
 3. Choose a sender, such as `Duewell <reminders@your-domain.com>`.
