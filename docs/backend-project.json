@@ -20,5 +20,10 @@
   "auth_smtp_configured": true,
   "support_email": "support@settleupapp.cloud",
   "worker_version": 4,
-  "release_build": "20743a39b5ede68b"
+  "release_build": "20743a39b5ede68b",
+  "release_branch": "release/hostinger",
+  "release_commit": "be5db0ef73c89a9bae8a5bf6cebcb821fd757cd9",
+  "deployment_status": "awaiting_hostinger_github_connection_approval",
+  "signup_and_device_delivery_test": "pending_owner_acceptance",
+  "auth_security_emails_enabled": true
 }
