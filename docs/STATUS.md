@@ -6,7 +6,7 @@ Updated November 22, 2026 (America/New_York).
 
 - Public app: https://settleupapp.cloud/ on the existing Hostinger Premium plan. Git deployment reports completed.
 - Connected repository: Nyiawungtech/debt-remindeer-app, selected repository only. Hostinger’s required administration/code/pull-request write permissions were explicitly approved by the owner.
-- Static deployment branch: `release/hostinger`, release commit `be5db0ef73c89a9bae8a5bf6cebcb821fd757cd9`, build `20743a39b5ede68b`, version `0.2.0-beta`. The 31-file release tree was verified against the local build before publishing.
+- Static deployment branch: `release/hostinger`, release commit `e33651268cadd7e70a83dcf3936f41e76e4d8145`, build `57f202d6950cc074`, version `0.2.0-beta`. The 37-file release tree was verified against the local build before publishing; prior hashed assets remain available for open sessions.
 - Source branch: `codex/duewell-pwa`, draft pull request #1. Keep the acceptance limits below visible before wider promotion.
 - Support: `support@settleupapp.cloud` is an active alias of the existing `reminders@settleupapp.cloud` mailbox. No new mailbox purchase was needed. Unrelated hosted websites were not modified.
 
@@ -28,6 +28,12 @@ Updated November 22, 2026 (America/New_York).
 - Server HEAD requests to `/.git/HEAD` and `/.env` return 403.
 - Browser sample flow: added $200 as four $50 installments; recorded $25; verified $175 remaining and updated progress; scheduled a future sample reminder. The demo clearly says no messages are sent and uses in-memory records.
 - Fixed header confirmed during scrolling. Compact responsive layout and mobile navigation visually checked at about 449 CSS pixels using browser zoom. Public help/privacy/terms pages render and show the support address.
+
+## UI motion update
+
+- Added staggered page/card entrances, animated progress fills, tactile button and navigation feedback, spring-style dialogs, toast entrances and gentle auth-page motion. Existing layout and financial behavior are unchanged.
+- Motion is enabled only when the device has not requested reduced motion. Keyboard focus cancels card entrances immediately. No new dependencies were added; the compressed CSS increase is about 1.4 KB.
+- Production build and both GitHub Actions runs passed on source commit `aed958e51e8e67cbf5e19741fe38169115788566`. Preview payment dialog opening, Escape dismissal and focus restoration were checked. The live release manifest and new CSS were verified after automatic Hostinger deployment.
 
 ## Acceptance still pending
 
