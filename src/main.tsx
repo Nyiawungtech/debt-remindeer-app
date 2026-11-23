@@ -28,7 +28,7 @@ class AppBoundary extends React.Component<
           your workspace.
         </p>
         <button className="primary" onClick={() => location.reload()}>
-          Reload Duewell
+          Reload SettleUp
         </button>
       </main>
     ) : (
@@ -57,7 +57,7 @@ if ("serviceWorker" in navigator && import.meta.env.PROD)
               worker.state === "installed" &&
               navigator.serviceWorker.controller
             )
-              window.dispatchEvent(new Event("duewell-update"));
+              window.dispatchEvent(new Event("settleup-update"));
           });
         });
       })

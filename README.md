@@ -1,4 +1,4 @@
-# Duewell
+# SettleUp
 
 A responsive debt reminder PWA built with **Ionic React, TypeScript, Vite and Supabase PostgreSQL**. The same UI can later be packaged using Capacitor; this milestone focuses on the PWA.
 
@@ -7,7 +7,7 @@ A responsive debt reminder PWA built with **Ionic React, TypeScript, Vite and Su
 - Sign up, email confirmation, login, password recovery, password changes, optional TOTP MFA, logout, export and account deletion.
 - Owner-isolated debts, custom or equal installments, anchored monthly schedules, full/partial payments, reversal history and installment edits.
 - Dashboard periods, remaining balance, money-based progress, active/completed debts, search, calendar, and context-aware empty states.
-- Email-only reminders to the verified account address, with per-installment timing and account-wide opt-out.
+- Email and encrypted Web Push reminders, with per-installment timing, device registration and channel opt-out.
 - Server-side scheduling, worker leases, Resend idempotency keys, conservative retries, provider status history, and private reminder content by default.
 - Install manifest, generated app icons, service worker, offline fallback, theme settings, fixed header, desktop sidebar and mobile navigation.
 
@@ -37,9 +37,11 @@ Node 24 is used in CI. The lockfile pins dependency resolution. Deno is a develo
 
 ## Connected backend
 
-The Duewell Supabase project is `motuhpcynixmorwolnlv` (US East). Its database migrations, three Edge Functions, encrypted runtime settings and minute scheduler are deployed. The client example configuration contains only public keys.
+The Supabase project is `motuhpcynixmorwolnlv` (US East). Its database migrations, three Edge Functions, encrypted runtime settings and minute scheduler are deployed. The client example configuration contains only public keys.
 
-A live transactional smoke test verified owner isolation, payment idempotency, overpayment prevention and server-only access to delivery configuration; synthetic records were rolled back. The scheduler successfully invoked the worker with HTTP 200 and no queued messages. Resend now verifies `settleupapp.cloud`; its domain-restricted sending key and sender address are stored in encrypted Vault settings. One owner-approved setup email was accepted and reported delivered by Resend. Public Auth SMTP/redirects, frontend HTTPS hosting and signup-to-scheduled-reminder acceptance still need activation/verification. SMS and push reminders are paused in both the UI and backend.
+Six migrations and the email/push dispatch worker are deployed. Live transactional checks verified ownership, payment rules, reminder scheduling and opt-out; all synthetic data was rolled back. Security advisors reported no notices. Resend verifies `settleupapp.cloud`; credentials are stored server-side in Vault. Production Auth redirects and custom Resend SMTP are configured. Hostinger deployment is being verified; see the exact acceptance status in [STATUS.md](docs/STATUS.md).
+
+The public beta uses **SettleUp** branding, USD amounts, email plus push reminders, persistent PKCE sessions, public help/privacy/terms, and installable PWA assets. SMS remains deferred. No independent security audit or real-device delivery certification is claimed.
 
 ## Connect and ship
 
@@ -53,9 +55,9 @@ Source layout:
 | `src/lib/domain.ts`     | Exact money, dates, periods and financial rules                            |
 | `src/lib/workspace.ts`  | Authenticated database actions and isolated sample workspace               |
 | `supabase/migrations/`  | Schema, RLS and transactional financial/worker RPCs                        |
-| `supabase/functions/`   | Email dispatch worker and account deletion (legacy SMS webhook is dormant) |
+| `supabase/functions/`   | Email/push dispatch worker and account deletion (legacy SMS webhook is dormant) |
 | `supabase/schedule.sql` | Vault-backed minute scheduler setup                                        |
 | `public/sw.js`          | Public asset caching and offline fallback                                  |
 | `tests/`                | Behavioral and database security tests                                     |
 
-This implementation has not undergone an independent security audit. Production delivery must be verified with your actual Supabase, email and hosting configuration before inviting public users.
+This implementation has not undergone an independent security audit. Complete the owner signup and device delivery acceptance in STATUS.md before a wider rollout.

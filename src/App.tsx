@@ -54,12 +54,20 @@ import {
   today,
   validatePayment,
   validateSchedule,
+  type Channel,
   type Debt,
   type Installment,
   type Period,
   type Profile,
   type Snapshot,
 } from "./lib/domain";
+import {
+  enablePush,
+  disablePush,
+  detachPush,
+  devicePushConnected,
+} from "./lib/push";
+import { LegalPage } from "./components/LegalPage";
 import { Auth } from "./components/Auth";
 import {
   Bar,
@@ -90,6 +98,7 @@ type UI = {
   demo: boolean;
   busy: boolean;
   act: Action;
+  refresh: () => Promise<void>;
   open: (m: ModalState) => void;
   go: (route: string) => void;
   toast: (text: string) => void;
@@ -210,12 +219,12 @@ export default function App() {
       };
     window.addEventListener("online", on);
     window.addEventListener("offline", on);
-    window.addEventListener("duewell-update", updates);
+    window.addEventListener("settleup-update", updates);
     window.addEventListener("beforeinstallprompt", prompt);
     return () => {
       window.removeEventListener("online", on);
       window.removeEventListener("offline", on);
-      window.removeEventListener("duewell-update", updates);
+      window.removeEventListener("settleup-update", updates);
       window.removeEventListener("beforeinstallprompt", prompt);
     };
   }, []);
@@ -241,6 +250,7 @@ export default function App() {
   async function signOut() {
     try {
       if (!demo) {
+        await detachPush();
         const { error } = await supabase!.auth.signOut();
         if (error) throw error;
       }
@@ -251,6 +261,13 @@ export default function App() {
       setToast((e as Error).message);
     }
   }
+  if (["privacy", "terms", "help"].includes(route))
+    return (
+      <LegalPage
+        page={route as "privacy" | "terms" | "help"}
+        onBack={() => go("home")}
+      />
+    );
   if (checking)
     return (
       <div className="loading">
@@ -352,6 +369,7 @@ export default function App() {
         demo,
         busy,
         act: safeAct,
+        refresh: workspace.refresh,
         open: setModal,
         go,
         toast: setToast,
@@ -403,7 +421,7 @@ export default function App() {
           <p>Keep every payment in view, one small step at a time.</p>
           <button className="text-button" onClick={() => void installApp()}>
             <Download size={16} />
-            Install Duewell
+            Install SettleUp
           </button>
         </div>
         <button className="profile-button" onClick={() => go("settings")}>
@@ -461,7 +479,7 @@ export default function App() {
         )}
         {update && (
           <div className="notice">
-            A fresh version of Duewell is ready.{" "}
+            A fresh version of SettleUp is ready.{" "}
             <button className="text-button" onClick={() => void updateApp()}>
               Update now
             </button>
@@ -922,7 +940,7 @@ function Home() {
       </div>
       <p className="footnote">
         <ShieldCheck size={15} />
-        Your balance reflects the debts and payments you’ve added to Duewell.
+        Your balance reflects the debts and payments you’ve added to SettleUp.
       </p>
     </>
   );
@@ -1575,6 +1593,8 @@ function Calendar() {
     </>
   );
 }
+const channelLabel = (channel: Channel) =>
+  channel === "email" ? "Email" : "Notification";
 function Reminders() {
   const { s, go, busy, act, toast } = useUI();
   const [view, setView] = useState("upcoming");
@@ -1601,7 +1621,7 @@ function Reminders() {
     <>
       <PageHeading
         title="A gentle nudge, right on time."
-        description="Your email reminders, and how they’re getting on."
+        description="Your reminders, and how they’re getting on."
         action={false}
       />
       <div className="filters">
@@ -1630,7 +1650,11 @@ function Reminders() {
             return (
               <article key={r.id} className="reminder-row">
                 <span className="reminder-icon">
-                  <Mail size={21} />
+                  {r.channel === "email" ? (
+                    <Mail size={21} />
+                  ) : (
+                    <Bell size={21} />
+                  )}
                 </span>
                 <div className="grow">
                   <button
@@ -1648,7 +1672,7 @@ function Reminders() {
                     · {s.profile.timezone}
                   </p>
                   <div className="row wrap">
-                    <span className="pill">Email</span>
+                    <span className="pill">{channelLabel(r.channel)}</span>
                     <span
                       className={`pill ${r.state === "delivered" ? "green" : r.state === "failed" ? "red" : ""}`}
                     >
@@ -1677,7 +1701,7 @@ function Reminders() {
                 {r.state === "pending" && (
                   <button
                     className="icon-button"
-                    aria-label={`Cancel email reminder for ${d.name}`}
+                    aria-label={`Cancel ${channelLabel(r.channel)} reminder for ${d.name}`}
                     disabled={busy}
                     onClick={() => void cancel(r.id)}
                   >
@@ -1708,8 +1732,8 @@ function Reminders() {
       </section>
       <p className="footnote">
         <Clock size={15} />
-        “Accepted” means the email provider received the request. It does not
-        confirm inbox delivery or that the email was read.
+        “Accepted” means the delivery provider received the request. It does not
+        confirm that the reminder was seen or read.
       </p>
     </>
   );
@@ -1723,11 +1747,18 @@ function SettingsPage({
   onSignOut: () => Promise<void>;
   onInstall: () => Promise<void>;
 }) {
-  const { s, demo, busy, act, toast, open } = useUI();
+  const { s, demo, busy, act, toast, open, refresh } = useUI();
   const [p, setP] = useState(s.profile),
     [error, setError] = useState(""),
     [authBusy, setAuthBusy] = useState(false),
-    [password, setPassword] = useState("");
+    [password, setPassword] = useState(""),
+    [device, setDevice] = useState(false);
+  useEffect(() => {
+    if (!demo)
+      void devicePushConnected()
+        .then(setDevice)
+        .catch(() => setDevice(false));
+  }, [demo]);
   const zones = [
     ...new Set([
       s.profile.timezone,
@@ -1748,11 +1779,36 @@ function SettingsPage({
         p_private: p.private_content,
         p_email: p.email_enabled,
         p_sms: false,
-        p_push: false,
+        p_push: p.push_enabled,
       });
       toast("Preferences saved.");
     } catch (e) {
       setError((e as Error).message);
+    }
+  }
+  async function devicePush() {
+    setAuthBusy(true);
+    setError("");
+    try {
+      if (demo)
+        throw new Error(
+          "Sign in to connect a device. The demo does not send notifications.",
+        );
+      if (device) {
+        await disablePush();
+        setDevice(false);
+        toast("Notifications disconnected on this device.");
+      } else {
+        await enablePush();
+        setDevice(true);
+        setP((previous) => ({ ...previous, push_enabled: true }));
+        toast("This device is ready for notifications.");
+      }
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setAuthBusy(false);
     }
   }
   async function changePassword(e: FormEvent) {
@@ -1785,7 +1841,7 @@ function SettingsPage({
       url = URL.createObjectURL(blob),
       link = document.createElement("a");
     link.href = url;
-    link.download = `duewell-export-${today()}.json`;
+    link.download = `settleup-export-${today()}.json`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast("Your export is ready. Keep it somewhere private.");
@@ -1844,8 +1900,8 @@ function SettingsPage({
           <section className="panel form-section">
             <h2>Reminder preferences</h2>
             <p className="muted">
-              Schedule email reminders beside each installment. Turn them off
-              here to cancel pending emails.
+              Choose how you receive reminders. Turning a channel off cancels
+              its pending reminders.
             </p>
             <label className="toggle-row">
               <span>
@@ -1860,8 +1916,38 @@ function SettingsPage({
             </label>
             <label className="toggle-row">
               <span>
-                <b>Keep email details private</b>
-                <small>Hide debt names and amounts in reminder emails.</small>
+                <b>Push notifications</b>
+                <small>Send reminders to your connected devices.</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={p.push_enabled}
+                onChange={(e) => update("push_enabled", e.target.checked)}
+              />
+            </label>
+            <div className="device-row">
+              <p className="small muted">
+                {device
+                  ? "Notifications are connected on this device."
+                  : "Connect this device to receive reminders with the app closed."}{" "}
+                On iPhone or iPad, add SettleUp to your Home Screen first.
+              </p>
+              <button
+                type="button"
+                className="secondary"
+                disabled={authBusy || demo}
+                onClick={() => void devicePush()}
+              >
+                <Bell size={17} />
+                {device ? "Disconnect this device" : "Enable on this device"}
+              </button>
+            </div>
+            <label className="toggle-row">
+              <span>
+                <b>Keep reminder details private</b>
+                <small>
+                  Hide debt names and amounts in emails and notifications.
+                </small>
               </span>
               <input
                 type="checkbox"
@@ -1896,7 +1982,7 @@ function SettingsPage({
             <MfaSettings demo={demo} />
           </section>
           <section className="panel form-section">
-            <h2>Take Duewell with you.</h2>
+            <h2>Take SettleUp with you.</h2>
             <p className="muted">
               Install the PWA for an app-like experience. Your account stays in
               sync when you sign in.
@@ -1905,6 +1991,18 @@ function SettingsPage({
               <Download size={17} />
               Install app
             </button>
+          </section>
+          <section className="panel form-section">
+            <h2>Help &amp; information</h2>
+            <p className="small muted">
+              SettleUp is in public beta. Share feedback with
+              support@settleupapp.cloud.
+            </p>
+            <div className="row wrap">
+              <a href="#help">Help &amp; support</a>
+              <a href="#privacy">Privacy</a>
+              <a href="#terms">Terms</a>
+            </div>
           </section>
           <section className="panel form-section">
             <h2>Your data, your choice.</h2>
@@ -1928,7 +2026,7 @@ function SettingsPage({
             {demo ? "Leave demo" : "Sign out"}
           </button>
           <p className="muted small">
-            Duewell · PWA v0.1.0
+            SettleUp · PWA v0.2.0 beta
             <br />
             Amounts in USD. Payments are made with your lender.
           </p>
@@ -1963,7 +2061,7 @@ function MfaSettings({ demo }: { demo: boolean }) {
     try {
       const { data, error } = await supabase!.auth.mfa.enroll({
         factorType: "totp",
-        friendlyName: "Duewell authenticator",
+        friendlyName: "SettleUp authenticator",
       });
       if (error) throw error;
       setFactor({
@@ -2115,7 +2213,7 @@ function PaymentForm({ id, close }: { id: string; close: () => void }) {
         {d.name} · Due {formatDate(i.due_date)}
       </p>
       <div className="notice small">
-        Make your payment with your lender first. This updates your Duewell
+        Make your payment with your lender first. This updates your SettleUp
         tracker.
       </div>
       <Field
@@ -2159,6 +2257,15 @@ function ReminderForm({ id, close }: { id: string; close: () => void }) {
   const current = s.reminders.filter(
     (r) => r.installment_id === id && r.active,
   );
+  const [channels, setChannels] = useState<Channel[]>(
+    current.length
+      ? [...new Set(current.map((r) => r.channel))]
+      : s.profile.email_enabled
+        ? ["email"]
+        : s.profile.push_enabled
+          ? ["push"]
+          : [],
+  );
   const [offsets, setOffsets] = useState<number[]>(
       current.length ? [...new Set(current.map((r) => r.days_before))] : [1],
     ),
@@ -2167,12 +2274,16 @@ function ReminderForm({ id, close }: { id: string; close: () => void }) {
   async function submit(e: FormEvent) {
     e.preventDefault();
     try {
-      if (!s.profile.email_enabled)
+      if (!channels.length)
+        throw new Error("Choose email, notifications, or both.");
+      if (channels.includes("email") && !s.profile.email_enabled)
         throw new Error("Enable email reminders in Settings first.");
+      if (channels.includes("push") && !s.profile.push_enabled)
+        throw new Error("Enable notifications in Settings first.");
       if (!offsets.length) throw new Error("Choose at least one reminder day.");
       await act("set_reminders", {
         p_installment: id,
-        p_channels: ["email"],
+        p_channels: channels,
         p_offsets: offsets,
         p_time: time,
       });
@@ -2191,23 +2302,38 @@ function ReminderForm({ id, close }: { id: string; close: () => void }) {
       <p className="muted">
         {d.name} · {money(remaining(s, i))} due {formatDate(i.due_date)}
       </p>
-      <Field
-        label="Send my reminder by"
-        hint="Sent to your verified account email."
-      >
-        <div className="email-destination">
-          <Mail size={20} aria-hidden="true" />
-          <div>
-            <b>Email</b>
-            <span>{email}</span>
-          </div>
-        </div>
-      </Field>
-      {!s.profile.email_enabled && (
-        <p className="small muted" role="status">
-          Email reminders are off. Enable them in Settings before scheduling.
-        </p>
-      )}
+      <fieldset className="channel-options">
+        <legend>Send my reminder by</legend>
+        {(["email", "push"] as Channel[]).map((channel) => {
+          const enabled =
+            channel === "email"
+              ? s.profile.email_enabled
+              : s.profile.push_enabled;
+          return (
+            <label className="checkbox-row" key={channel}>
+              <input
+                type="checkbox"
+                disabled={!enabled}
+                checked={channels.includes(channel)}
+                onChange={(e) =>
+                  setChannels(
+                    e.target.checked
+                      ? [...channels, channel]
+                      : channels.filter((c) => c !== channel),
+                  )
+                }
+              />
+              <span>
+                <b>{channelLabel(channel)}</b>
+                <small>
+                  {channel === "email" ? email : "Your connected devices"}
+                  {!enabled ? " · Enable in Settings" : ""}
+                </small>
+              </span>
+            </label>
+          );
+        })}
+      </fieldset>
       <fieldset>
         <legend>When would you like a nudge?</legend>
         <div className="offset-options">
@@ -2250,7 +2376,7 @@ function ReminderForm({ id, close }: { id: string; close: () => void }) {
         <button type="button" className="ghost" onClick={close} disabled={busy}>
           Cancel
         </button>
-        <button className="primary" disabled={busy || !s.profile.email_enabled}>
+        <button className="primary" disabled={busy || !channels.length}>
           {busy ? "Scheduling…" : "Save reminder"}
         </button>
       </div>

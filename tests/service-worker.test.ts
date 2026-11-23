@@ -8,7 +8,7 @@ function runtime() {
     fetched: any[] = [],
     retired: string[] = [];
   const self = {
-    location: { origin: "https://duewell.example" },
+    location: { origin: "https://settleup.example" },
     addEventListener: (name: string, handler: Function) =>
       (handlers[name] = handler),
     registration: {
@@ -72,7 +72,7 @@ it("only pre-caches public assets and an offline fallback", async () => {
   });
   await task!;
   expect(r.stored).toContain("/offline.html");
-  expect(r.stored).not.toContain("/");
+  expect(r.stored).toContain("/index.html");
   expect(r.stored.every((path: string) => !path.includes("supabase"))).toBe(
     true,
   );
@@ -81,8 +81,8 @@ it("never intercepts API responses, authentication calls or mutation requests", 
   const r = runtime();
   for (const request of [
     { url: "https://project.supabase.co/rest/v1/debts", method: "GET" },
-    { url: "https://duewell.example/api/account", method: "GET" },
-    { url: "https://duewell.example/assets/data", method: "POST" },
+    { url: "https://settleup.example/api/account", method: "GET" },
+    { url: "https://settleup.example/assets/data", method: "POST" },
   ]) {
     let intercepted = false;
     r.handlers.fetch({
@@ -99,7 +99,7 @@ it("does not store account navigation responses", async () => {
   let task: Promise<unknown>;
   r.handlers.fetch({
     request: {
-      url: "https://duewell.example/#debts",
+      url: "https://settleup.example/?code=auth-code#debts",
       method: "GET",
       mode: "navigate",
     },
@@ -108,13 +108,52 @@ it("does not store account navigation responses", async () => {
   await task!;
   expect(r.stored).toHaveLength(0);
 });
-it("retires existing push subscriptions while retaining PWA offline support", async () => {
+it("preserves device subscriptions when updating the app shell", async () => {
   const r = runtime();
   let task: Promise<unknown>;
   r.handlers.activate({ waitUntil: (p: Promise<unknown>) => (task = p) });
   await task!;
-  expect(r.retired).toEqual(["device"]);
-  expect(r.handlers.push).toBeUndefined();
-  expect(r.handlers.notificationclick).toBeUndefined();
+  expect(r.retired).toEqual([]);
+  expect(r.handlers.push).toBeTypeOf("function");
+  expect(r.handlers.notificationclick).toBeTypeOf("function");
   expect(r.handlers.fetch).toBeTypeOf("function");
+});
+it("shows malformed push safely and does not open external or credential-bearing notification links", async () => {
+  const r = runtime();
+  for (const value of [
+    "https://evil.test/",
+    "https://settleup.example/?code=secret#debts",
+    "/#debt/123",
+  ]) {
+    let task: Promise<unknown>;
+    r.handlers.push({
+      data: { json: () => ({ url: value }) },
+      waitUntil: (p: Promise<unknown>) => (task = p),
+    });
+    await task!;
+    const options = r.shown.at(-1)[1];
+    expect(options.data.url).toBe(
+      value === "/#debt/123" ? value : "/#reminders",
+    );
+    r.handlers.notificationclick({
+      notification: { close() {}, data: { url: value } },
+      waitUntil: (p: Promise<unknown>) => (task = p),
+    });
+    await task!;
+    expect(r.fetched.at(-1)).toBe(
+      "https://settleup.example" +
+        (value === "/#debt/123" ? value : "/#reminders"),
+    );
+  }
+  let task: Promise<unknown>;
+  r.handlers.push({
+    data: {
+      json: () => {
+        throw new Error("bad JSON");
+      },
+    },
+    waitUntil: (p: Promise<unknown>) => (task = p),
+  });
+  await task!;
+  expect(r.shown.at(-1)[0]).toBe("SettleUp reminder");
 });

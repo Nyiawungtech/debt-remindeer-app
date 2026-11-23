@@ -9,10 +9,11 @@ export const supabase = configured
         autoRefreshToken: true,
         detectSessionInUrl: true,
         flowType: "pkce",
-        storage: sessionStorage,
+        storageKey: "settleup.auth",
       },
     })
   : null;
+export const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || "";
 export const appUrl = import.meta.env.VITE_APP_URL || location.origin;
 export async function rpc<T>(
   name: string,

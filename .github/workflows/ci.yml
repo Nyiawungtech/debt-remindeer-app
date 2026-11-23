@@ -1,4 +1,4 @@
-name: Verify Duewell
+name: Verify SettleUp
 on: [push, pull_request]
 permissions:
   contents: read

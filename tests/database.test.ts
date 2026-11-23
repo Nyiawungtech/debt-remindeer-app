@@ -153,9 +153,9 @@ describe("actual PostgreSQL ownership and financial invariants", () => {
       ),
     ).toBe(21000);
   });
-  it("rejects deferred channels and preference changes even through direct RPCs", async () => {
+  it("rejects SMS, empty channels, and push without a registered device", async () => {
     await owner();
-    for (const channels of [["sms"], ["push"], ["email", "sms"], []])
+    for (const channels of [["sms"], ["email", "sms"]])
       await expect(
         db.query("select public.set_reminders($1,$2,$3,$4)", [
           iid,
@@ -163,28 +163,141 @@ describe("actual PostgreSQL ownership and financial invariants", () => {
           [1],
           "09:00",
         ]),
-      ).rejects.toThrow("Only email");
-    for (const flags of [
-      [true, false],
-      [false, true],
+      ).rejects.toThrow("SMS reminders");
+    await expect(
+      db.query("select public.set_reminders($1,$2,$3,$4)", [
+        iid,
+        [],
+        [1],
+        "09:00",
+      ]),
+    ).rejects.toThrow("Choose email");
+    await expect(
+      db.query("select public.save_preferences($1,$2,$3,$4,$5,$6,$7)", [
+        "Alice",
+        "UTC",
+        "system",
+        true,
+        true,
+        true,
+        false,
+      ]),
+    ).rejects.toThrow("SMS reminders");
+    await expect(
+      db.query("select public.set_reminders($1,$2,$3,$4)", [
+        iid,
+        ["push"],
+        [1],
+        "09:00",
+      ]),
+    ).rejects.toThrow("Enable notifications");
+  });
+  it("binds push subscriptions to their owner and rejects server-side request forgery", async () => {
+    await owner();
+    const endpoint = "https://fcm.googleapis.com/fcm/send/test-device";
+    for (const invalid of [
+      "https://127.0.0.1/",
+      "http://fcm.googleapis.com/x",
+      "https://fcm.googleapis.com.attacker.test/x",
+      "https://fcm.googleapis.com@evil.test/x",
+      "https://fcm.googleapis.com:8443/x",
     ])
       await expect(
-        db.query("select public.save_preferences($1,$2,$3,$4,$5,$6,$7)", [
-          "Alice",
-          "UTC",
-          "system",
-          true,
-          true,
-          ...flags,
+        db.query("select public.register_push($1,$2,$3)", [
+          invalid,
+          "a".repeat(87),
+          "b".repeat(22),
         ]),
-      ).rejects.toThrow("Only email");
+      ).rejects.toThrow("Unsupported push service");
+    await db.query("select public.register_push($1,$2,$3)", [
+      endpoint,
+      "a".repeat(87),
+      "b".repeat(22),
+    ]);
+    expect(
+      (
+        await db.query<{ ok: boolean }>(
+          "select public.has_push_subscription($1) as ok",
+          [endpoint],
+        )
+      ).rows[0].ok,
+    ).toBe(true);
+    await expect(
+      db.query("select * from public.push_subscriptions"),
+    ).rejects.toThrow("permission denied");
+    await owner(b);
+    expect(
+      (
+        await db.query<{ ok: boolean }>(
+          "select public.has_push_subscription($1) as ok",
+          [endpoint],
+        )
+      ).rows[0].ok,
+    ).toBe(false);
     await expect(
       db.query("select public.register_push($1,$2,$3)", [
-        "https://fcm.googleapis.com/fcm/send/old-client",
+        endpoint,
         "a".repeat(87),
         "b".repeat(22),
       ]),
-    ).rejects.toThrow("Only email");
+    ).rejects.toThrow("another account");
+    await db.query("select public.remove_push($1)", [endpoint]);
+    await owner();
+    expect(
+      (
+        await db.query<{ ok: boolean }>(
+          "select public.has_push_subscription($1) as ok",
+          [endpoint],
+        )
+      ).rows[0].ok,
+    ).toBe(true);
+    expect(
+      (
+        await db.query<{ count: number }>(
+          "select public.set_reminders($1,$2,$3,$4) as count",
+          [iid, ["email", "push"], [1], "09:00"],
+        )
+      ).rows[0].count,
+    ).toBe(2);
+    await root();
+    const pushId = (
+      await db.query<{ id: string }>(
+        "update public.reminders set state='processing' where installment_id=$1 and channel='push' and active returning id",
+        [iid],
+      )
+    ).rows[0].id;
+    await db.exec("set role service_role");
+    const value = (
+      await db.query<{ payload: Record<string, unknown> }>(
+        "select public.reminder_payload($1) as payload",
+        [pushId],
+      )
+    ).rows[0].payload;
+    expect(value.channel).toBe("push");
+    expect(value).not.toHaveProperty("email");
+    expect(value).not.toHaveProperty("phone");
+    expect(value.subscriptions).toHaveLength(1);
+    await root();
+    await db.query("update public.reminders set state='pending' where id=$1", [
+      pushId,
+    ]);
+    await owner();
+    await db.query("select public.save_preferences($1,$2,$3,$4,$5,$6,$7)", [
+      "Alice",
+      "UTC",
+      "system",
+      true,
+      true,
+      false,
+      false,
+    ]);
+    expect(
+      (
+        await db.query(
+          "select id from public.reminders where channel='push' and state='pending'",
+        )
+      ).rows,
+    ).toHaveLength(0);
   });
   it("schedules distinct email reminders in the account time zone", async () => {
     await owner();
@@ -219,7 +332,7 @@ describe("actual PostgreSQL ownership and financial invariants", () => {
         "insert into public.reminders(owner_id,installment_id,channel,days_before,send_time,scheduled_at) values($1,$2,'sms',3,'09:00',now())",
         [a, iid],
       ),
-    ).rejects.toThrow("email_only_queue");
+    ).rejects.toThrow("supported_reminder_queue");
     const id = (
       await db.query<{ id: string }>(
         "update public.reminders set state='processing' where installment_id=$1 and days_before=1 and active returning id",
@@ -368,10 +481,10 @@ describe("actual PostgreSQL ownership and financial invariants", () => {
       ]),
     ).rejects.toThrow("verify your email");
   });
-  it("keeps delivery credentials inaccessible to clients and omits inactive-provider settings", async () => {
+  it("keeps delivery credentials inaccessible to clients and omits deferred SMS provider settings", async () => {
     await root();
     await db.exec(
-      "insert into vault.decrypted_secrets values('duewell_resend_api_key','test-only'),('duewell_twilio_auth_token','inactive-test-only'),('duewell_vapid_private_key','inactive-test-only')",
+      "insert into vault.decrypted_secrets values('duewell_resend_api_key','test-only'),('duewell_twilio_auth_token','inactive-test-only'),('duewell_vapid_private_key','vapid-test-only')",
     );
     await owner(b);
     await expect(db.query("select public.delivery_config()")).rejects.toThrow(
@@ -384,7 +497,10 @@ describe("actual PostgreSQL ownership and financial invariants", () => {
         "select public.delivery_config() as config",
       )
     ).rows[0].config;
-    expect(settings).toEqual({ RESEND_API_KEY: "test-only" });
+    expect(settings).toEqual({
+      RESEND_API_KEY: "test-only",
+      VAPID_PRIVATE_KEY: "vapid-test-only",
+    });
   });
   it("expires uncertain processing leases without resending", async () => {
     await root();

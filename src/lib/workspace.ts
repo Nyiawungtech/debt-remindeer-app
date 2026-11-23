@@ -17,7 +17,8 @@ async function fetchSnapshot(): Promise<Snapshot> {
     tables.map((table) =>
       collectPages(async (after) => {
         let query = supabase!.from(table).select("*").order("id").limit(1000);
-        if (table === "reminders") query = query.eq("channel", "email");
+        if (table === "reminders")
+          query = query.in("channel", ["email", "push"]);
         if (after) query = query.gt("id", after);
         const { data, error } = await query;
         if (error) throw new Error(error.message);
@@ -187,12 +188,14 @@ export function useWorkspace(session: Session | null, demo: boolean) {
           break;
         }
         case "save_preferences":
-          if (a.p_sms || a.p_push)
-            throw new Error("Only email reminders are available right now.");
+          if (a.p_sms)
+            throw new Error("SMS reminders are not available in this release.");
           for (const r of next.reminders)
             if (
               r.state === "pending" &&
-              (a.p_timezone !== next.profile.timezone || !a.p_email)
+              (a.p_timezone !== next.profile.timezone ||
+                (r.channel === "email" && !a.p_email) ||
+                (r.channel === "push" && !a.p_push))
             ) {
               r.state = "cancelled";
               r.active = false;
@@ -205,14 +208,19 @@ export function useWorkspace(session: Session | null, demo: boolean) {
             private_content: a.p_private,
             email_enabled: a.p_email,
             sms_enabled: false,
-            push_enabled: false,
+            push_enabled: a.p_push,
           });
           break;
         case "set_reminders": {
-          if (a.p_channels?.length !== 1 || a.p_channels[0] !== "email")
-            throw new Error("Only email reminders are available right now.");
-          if (!next.profile.email_enabled)
+          if (
+            !a.p_channels?.length ||
+            a.p_channels.some((c: string) => !["email", "push"].includes(c))
+          )
+            throw new Error("SMS reminders are not available in this release.");
+          if (a.p_channels.includes("email") && !next.profile.email_enabled)
             throw new Error("Enable email reminders in Settings first.");
+          if (a.p_channels.includes("push") && !next.profile.push_enabled)
+            throw new Error("Enable notifications in Settings first.");
           const i = next.installments.find((i) => i.id === a.p_installment)!;
           const rows = [];
           for (const c of a.p_channels as Channel[])

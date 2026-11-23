@@ -6,6 +6,14 @@ import {
   type EmailPayload,
 } from "../supabase/functions/_shared/email";
 import { supabaseKey } from "../supabase/functions/_shared/keys";
+import { createECDH, randomBytes } from "node:crypto";
+import * as webpush from "web-push";
+import {
+  allowedPushEndpoint,
+  pushMessage,
+  sendReminderPush,
+  type PushPayload,
+} from "../supabase/functions/_shared/push";
 it("reads modern named Supabase keys before legacy compatibility keys", () => {
   const values: Record<string, string> = {
     SUPABASE_SECRET_KEYS: JSON.stringify({ default: "sb_secret_test" }),
@@ -25,8 +33,8 @@ const payload: EmailPayload = {
 };
 const config = {
   apiKey: "test-key",
-  from: "Duewell <reminders@example.com>",
-  appUrl: "https://duewell.example/",
+  from: "SettleUp <reminders@example.com>",
+  appUrl: "https://settleup.example/",
 };
 it("sends a private email to the account with a stable idempotency key and settings link", async () => {
   const send = vi
@@ -45,7 +53,7 @@ it("sends a private email to the account with a stable idempotency key and setti
   });
   const body = JSON.parse(init?.body as string);
   expect(body.to).toEqual(["owner@example.com"]);
-  expect(body.text).toContain("https://duewell.example/#settings");
+  expect(body.text).toContain("https://settleup.example/#settings");
   expect(body.text).not.toContain("Amazon");
   expect(body.text).not.toContain("50.25");
 });
@@ -65,13 +73,109 @@ it("includes debt details only when privacy is turned off", async () => {
     "$50.25 for Amazon iPad is due 2027-12-06",
   );
 });
-it("rejects deferred channels without making a provider request", async () => {
+it("does not send non-email channels to the email provider", async () => {
   const send = vi.fn<typeof fetch>();
   for (const channel of ["sms", "push"])
     await expect(
       sendReminderEmail("job-id", { ...payload, channel }, config, send),
     ).rejects.toThrow("unsupported_channel");
   expect(send).not.toHaveBeenCalled();
+});
+const push: PushPayload = {
+  ...payload,
+  channel: "push",
+  subscriptions: [
+    {
+      id: "one",
+      endpoint: "https://fcm.googleapis.com/fcm/send/test-one",
+      keys: { p256dh: "test", auth: "test" },
+    },
+    {
+      id: "two",
+      endpoint: "https://web.push.apple.com/test-two",
+      keys: { p256dh: "test", auth: "test" },
+    },
+  ],
+};
+it("constructs an encrypted, VAPID-authenticated Web Push request without contacting a provider", () => {
+  const client = createECDH("prime256v1");
+  client.generateKeys();
+  const vapid = webpush.generateVAPIDKeys();
+  const request = webpush.generateRequestDetails(
+    {
+      endpoint: "https://fcm.googleapis.com/fcm/send/test-device",
+      keys: {
+        p256dh: client.getPublicKey().toString("base64url"),
+        auth: randomBytes(16).toString("base64url"),
+      },
+    },
+    pushMessage("job", push),
+    {
+      vapidDetails: {
+        subject: "https://settleupapp.cloud",
+        publicKey: vapid.publicKey,
+        privateKey: vapid.privateKey,
+      },
+      TTL: 3600,
+    },
+  );
+  expect(request.headers.Authorization).toMatch(/^vapid /);
+  expect(request.headers["Content-Encoding"]).toBe("aes128gcm");
+  expect(request.body?.toString()).not.toContain("SettleUp");
+  expect(request.body?.length).toBeGreaterThan(100);
+});
+it("keeps push content private by default and restricts delivery to browser push services", () => {
+  const message = JSON.parse(pushMessage("job", push));
+  expect(message.body).not.toContain("Amazon");
+  expect(message.body).not.toContain("50.25");
+  expect(message.url).toBe("/#debt/debt-id");
+  expect(
+    JSON.parse(pushMessage("job", { ...push, private_content: false })).body,
+  ).toContain("$50.25");
+  for (const endpoint of [
+    "http://fcm.googleapis.com/x",
+    "https://fcm.googleapis.com@evil.test/x",
+    "https://127.0.0.1/x",
+    "https://fcm.googleapis.com.evil.test/x",
+    "https://fcm.googleapis.com:8443/x",
+  ])
+    expect(allowedPushEndpoint(endpoint)).toBe(false);
+  expect(allowedPushEndpoint(push.subscriptions[0].endpoint)).toBe(true);
+});
+it("retires expired devices and avoids duplicate sends after partial acceptance", async () => {
+  const send = vi
+    .fn()
+    .mockRejectedValueOnce({ statusCode: 410 })
+    .mockResolvedValueOnce({ statusCode: 201 });
+  const retire = vi.fn().mockResolvedValue(undefined);
+  expect(await sendReminderPush("job", push, send, retire)).toBe("web-push:1");
+  expect(retire).toHaveBeenCalledWith("one");
+  expect(send).toHaveBeenCalledTimes(2);
+  const partial = vi
+    .fn()
+    .mockResolvedValueOnce({ statusCode: 201 })
+    .mockRejectedValueOnce({ statusCode: 429 });
+  expect(await sendReminderPush("job", push, partial, retire)).toBe(
+    "web-push:1",
+  );
+});
+it("retries push rate limits only when no send has an uncertain result", async () => {
+  const retire = vi.fn().mockResolvedValue(undefined);
+  await expect(
+    sendReminderPush(
+      "job",
+      push,
+      vi.fn().mockRejectedValue({ statusCode: 429 }),
+      retire,
+    ),
+  ).rejects.toMatchObject({ retry: true });
+  const send = vi
+    .fn()
+    .mockRejectedValueOnce({ statusCode: 429 })
+    .mockRejectedValueOnce(new Error("timeout"));
+  await expect(
+    sendReminderPush("job", push, send, retire),
+  ).rejects.toMatchObject({ code: "push_delivery_uncertain", retry: false });
 });
 it("retries confirmed rate limits but does not automatically retry uncertain delivery", async () => {
   for (const status of [429, 500]) {

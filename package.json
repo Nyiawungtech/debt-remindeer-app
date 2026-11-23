@@ -1,6 +1,6 @@
 {
-  "name": "duewell",
-  "version": "0.1.0",
+  "name": "settleup",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/prepare-release.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "check": "tsc -b",
@@ -29,11 +29,13 @@
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^6.3.0",
     "deno": "^2.9.6",
     "prettier": "^3.10.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
-    "vitest": "^5.1.1"
+    "vitest": "^5.1.1",
+    "web-push": "^4.0.0"
   }
 }

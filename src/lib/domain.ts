@@ -1,5 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
-export type Channel = "email";
+export type Channel = "email" | "push";
 export type Theme = "light" | "dark" | "system";
 export interface Profile {
   id: string;
@@ -148,7 +148,7 @@ export function emptyCopy(s: Snapshot, period: Period, day: string) {
   if (!balance(s))
     return {
       title: "Every tracked debt, completed.",
-      text: "You’ve paid off all the debts in Duewell. That’s a milestone.",
+      text: "You’ve paid off all the debts in SettleUp. That’s a milestone.",
     };
   const overdue = s.installments.filter(
     (i) => i.due_date < day && remaining(s, i) > 0,

@@ -1,15 +1,24 @@
 {
   "project_id": "motuhpcynixmorwolnlv",
-  "name": "Duewell",
+  "name": "SettleUp",
   "region": "us-east-1",
   "api_url": "https://motuhpcynixmorwolnlv.supabase.co",
   "frontend_public": false,
   "sms_provider_configured": false,
   "email_provider_configured": true,
-  "enabled_channels": ["email"],
-  "deferred_channels": ["sms", "push"],
+  "enabled_channels": [
+    "email",
+    "push"
+  ],
+  "deferred_channels": [
+    "sms"
+  ],
   "sending_domain": "settleupapp.cloud",
   "email_domain_verified": true,
-  "email_from": "Duewell <reminders@settleupapp.cloud>",
-  "email_provider_test": "delivered"
+  "email_from": "SettleUp <reminders@settleupapp.cloud>",
+  "email_provider_test": "delivered",
+  "auth_smtp_configured": true,
+  "support_email": "support@settleupapp.cloud",
+  "worker_version": 4,
+  "release_build": "20743a39b5ede68b"
 }

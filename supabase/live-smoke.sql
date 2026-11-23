@@ -25,12 +25,12 @@ begin
  begin
   perform public.set_reminders(iid,array['sms'],array[1],'09:00');
   raise exception 'SMS guard failed';
- exception when others then if sqlerrm not like '%Only email%' then raise; end if;
+ exception when others then if sqlerrm not like '%SMS reminders%' then raise; end if;
  end;
  begin
-  perform public.register_push('https://fcm.googleapis.com/fcm/send/old-client','unused','unused');
+  perform public.register_push('https://127.0.0.1/','unused','unused');
   raise exception 'Push guard failed';
- exception when others then if sqlerrm not like '%Only email%' then raise; end if;
+ exception when others then if sqlerrm not like '%Unsupported push service%' then raise; end if;
  end;
  perform public.save_preferences('QA','America/New_York','system',true,false,false,false);
  if exists(select 1 from public.reminders where state='pending') then raise exception 'Email opt-out failed'; end if;
@@ -48,4 +48,4 @@ begin
 end $verify$;
 reset role;
 rollback;
-select jsonb_build_object('checks_passed',array['owner isolation','payment idempotency','overpayment protection','worker secret isolation','cross-account mutation rejection','email scheduling','SMS and push guards','email opt-out'],'synthetic_data_rolled_back',true) as verification;
+select jsonb_build_object('checks_passed',array['owner isolation','payment idempotency','overpayment protection','worker secret isolation','cross-account mutation rejection','email scheduling','SMS and push endpoint guards','email opt-out'],'synthetic_data_rolled_back',true) as verification;

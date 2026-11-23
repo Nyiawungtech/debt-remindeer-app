@@ -23,7 +23,7 @@ export async function sendReminderEmail(
 ): Promise<string> {
   if (p.channel !== "email") throw new DeliveryError("unsupported_channel");
   const detail = p.private_content
-    ? "You have an upcoming payment. Open Duewell to review your schedule."
+    ? "You have an upcoming payment. Open SettleUp to review your schedule."
     : `${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(p.amount_cents / 100)} for ${p.name} is due ${p.due_date}.`;
   const origin = config.appUrl.replace(/\/$/, "");
   const response = await send("https://api.resend.com/emails", {
@@ -36,8 +36,8 @@ export async function sendReminderEmail(
     body: JSON.stringify({
       from: config.from,
       to: [p.email],
-      subject: "Your Duewell payment reminder",
-      text: `Duewell: ${detail}\n\nView your schedule: ${origin}/#debt/${p.debt_id}\nManage reminders: ${origin}/#settings`,
+      subject: "Your SettleUp payment reminder",
+      text: `SettleUp: ${detail}\n\nView your schedule: ${origin}/#debt/${p.debt_id}\nManage reminders: ${origin}/#settings`,
     }),
     signal: AbortSignal.timeout(20000),
   });

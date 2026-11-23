@@ -27,6 +27,7 @@ export function Auth({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [agreed, setAgreed] = useState(false);
   useEffect(() => {
     if (recovery) setMode("recovery");
   }, [recovery]);
@@ -42,6 +43,10 @@ export function Auth({
         );
       let result;
       if (mode === "signup") {
+        if (!agreed)
+          throw new Error(
+            "Please read and accept the terms before creating an account.",
+          );
         result = await supabase.auth.signUp({
           email,
           password,
@@ -49,6 +54,7 @@ export function Auth({
             data: {
               display_name: name,
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              terms_version: "2026-11-22-beta",
             },
             emailRedirectTo: appUrl,
           },
@@ -123,7 +129,7 @@ export function Auth({
         </div>
       </section>
       <section className="auth-form">
-        <span className="eyebrow">WELCOME TO DUEWELL</span>
+        <span className="eyebrow">WELCOME TO SETTLEUP · PUBLIC BETA</span>
         <h2>
           {mode === "signup"
             ? "Let’s get you a clearer picture."
@@ -197,6 +203,20 @@ export function Auth({
               </div>
             </Field>
           )}
+          {mode === "signup" && (
+            <label className="consent">
+              <input
+                required
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+              />
+              <span>
+                I agree to the <a href="#terms">Terms</a> and acknowledge the{" "}
+                <a href="#privacy">Privacy Policy</a>.
+              </span>
+            </label>
+          )}
           <ErrorText text={error} />
           {notice && (
             <p className="notice" role="status">
@@ -222,7 +242,9 @@ export function Auth({
         )}
         {mode !== "recovery" && (
           <p className="auth-switch">
-            {mode === "signup" ? "Already have an account?" : "New to Duewell?"}{" "}
+            {mode === "signup"
+              ? "Already have an account?"
+              : "New to SettleUp?"}{" "}
             <button
               className="text-button"
               onClick={() => change(mode === "signup" ? "login" : "signup")}
@@ -246,8 +268,13 @@ export function Auth({
               : "Preview workspace · Live accounts and delivery await service setup."}
           </small>
         </div>
+        <nav className="legal-links" aria-label="Help and policies">
+          <a href="#help">Help</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#terms">Terms</a>
+        </nav>
         <p className="legal-note">
-          Duewell tracks payments you make elsewhere. It doesn’t transfer money
+          SettleUp tracks payments you make elsewhere. It doesn’t transfer money
           or connect to your bank.
         </p>
       </section>

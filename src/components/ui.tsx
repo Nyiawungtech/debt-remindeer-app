@@ -37,9 +37,9 @@ export function Brand() {
   return (
     <span className="brand">
       <span className="brand-mark">
-        d<span>·</span>
+        s<span>·</span>
       </span>
-      duewell<span className="brand-dot">.</span>
+      settleup<span className="brand-dot">.</span>
     </span>
   );
 }
