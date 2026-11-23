@@ -6,7 +6,7 @@ Updated November 23, 2026 (America/New_York).
 
 - Public app: https://settleupapp.cloud/ on the existing Hostinger Premium plan. Git deployment reports completed.
 - Connected repository: Nyiawungtech/debt-remindeer-app, selected repository only. Hostinger’s required administration/code/pull-request write permissions were explicitly approved by the owner.
-- Static deployment branch: `release/hostinger`, release commit `571de2b92d0f201687b37393480ee4c3db2d2b3c`, build `04f104d6895df145`, version `0.2.0-beta`. The 49-file release tree was verified against the local build before publishing; prior hashed assets remain available for open sessions.
+- Static deployment branch: `release/hostinger`, release commit `926caa08b7b3985ddc799284568a9ac377e814ed`, build `9ae1d839e36c74ee`, version `0.2.0-beta`. The 55-file release tree was verified before publishing; prior hashed assets remain available for open sessions.
 - Source branch: `codex/duewell-pwa`, draft pull request #1. Keep the acceptance limits below visible before wider promotion.
 - Support: `support@settleupapp.cloud` is an active alias of the existing `reminders@settleupapp.cloud` mailbox. No new mailbox purchase was needed. Unrelated hosted websites were not modified.
 
@@ -21,7 +21,7 @@ Updated November 23, 2026 (America/New_York).
 
 ## Verified
 
-- 51 automated tests pass: PostgreSQL ownership and money invariants through PGlite, reminder channels/opt-out, provider errors/privacy, encrypted VAPID request construction, pagination and service-worker cache/URL boundaries.
+- 57 automated tests pass: PostgreSQL ownership and money invariants through PGlite, reminder channels/opt-out, provider errors/privacy, encrypted VAPID request construction, pagination, service-worker cache/URL boundaries, and installment-derived debt totals.
 - TypeScript/Vite production build and Deno checks pass. GitHub Actions passed on the published source. Live transactional checks passed with all synthetic account/financial data rolled back. Supabase security advisors reported no notices.
 - Live HTTPS root returns 200. HTTP and www redirect to the canonical HTTPS origin. CSP, HSTS, nosniff, manifest MIME and no-cache HTML/manifest/service-worker headers were confirmed. Service-Worker-Allowed is `/`.
 - Live release.json and service-worker cache version match the tested build. All 28 precache assets returned 200; PNG dimensions were correct for 192, 512, maskable and Apple touch icons.
@@ -52,12 +52,20 @@ Updated November 23, 2026 (America/New_York).
 - The workspace disconnected during artifact upload. GitHub's read-only runner rebuilt the same `04f104d6895df145` release with the committed public frontend configuration; its tests, build and Deno checks passed. The recovered release tree was verified across all 49 files before publishing. The temporary payload-log export was removed after recovery. CI keeps the public build configuration step.
 - The frontend is published on `release/hostinger` at `571de2b92d0f201687b37393480ee4c3db2d2b3c`. Reminder worker v5 and database/security settings were unchanged.
 
+## Installment-derived debt totals
+
+- New debts no longer require an upfront total. Users set installment count, frequency and first date, generate the dates, then enter or adjust each card's date and amount. The displayed debt total updates from the exact integer-cent sum, including after adding or removing installments.
+- An optional amount per installment fills equal payments. Generating dates without that amount preserves previously entered amounts. The existing split-a-known-total option remains in a collapsed disclosure.
+- Saving derives the total from the completed schedule and applies the existing amount/date/count validation before calling `create_debt`. Incomplete, invalid, nonpositive and excessive amounts cannot be saved. No database, authentication or reminder-worker changes were needed.
+- Source commit `038cd213b8e86c17be47c9c09a8c181fe816fbc7` passed both GitHub Actions runs (`45216633973` push and `45216649287` pull request), including all 57 tests, production build and Deno checks.
+- Preview checks saved three unequal payments of $50.25, $40.01 and $100 as $190.26 at a narrow browser width. Live sample mode generated four $50.25 payments ($201), immediately recalculated $200 after changing the last amount to $49.25, and saved all four dated payments with the correct $200 original debt. These were in-memory demo records; no real account, debt or reminder was created.
+
 ## Latest live verification
 
-- GitHub push run `45136072776` passed all 51 tests, the production build, Deno checks and the opt-in live deployment check. Live release `04f104d6895df145` was confirmed on Hostinger.
+- Local live verification passed for published build `9ae1d839e36c74ee` on Hostinger after automatic deployment from release commit `926caa08b7b3985ddc799284568a9ac377e814ed`.
 - `/add`, `/confirm-email` and `/privacy` returned the exact expected app shell with CSP. All 28 public precache assets were checked; code/font/text assets and the service worker matched the build bytes. The PNG icons returned valid PNGs with the expected 192, 512, maskable 512 and Apple 180 dimensions; their encodings differed from the build, so pixel identity was not asserted.
 - The live check is available through `scripts/verify-live.mjs` after building with the public frontend configuration. CI runs it only on a push commit whose message contains `[verify-live]`, after a release has been published. It uses no account credentials and sends no reminders.
-- Preview layout checks were completed before the browser/workspace connection dropped. No live browser rerender or physical iPhone check was possible afterward; live HTTP/build verification succeeded through the read-only runner.
+- An existing live browser session displayed the PWA update prompt; Update now loaded the new form. The complete live sample creation flow was verified in the browser. Physical iPhone and installed-device acceptance remain pending.
 
 ## Acceptance still pending
 
