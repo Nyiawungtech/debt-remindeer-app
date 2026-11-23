@@ -69,6 +69,13 @@ import {
 } from "./lib/push";
 import { LegalPage } from "./components/LegalPage";
 import { Auth } from "./components/Auth";
+import { DateInput } from "./components/DateInput";
+import {
+  currentRoute,
+  handleAppLink,
+  migrateLegacyRoute,
+  navigate,
+} from "./lib/navigation";
 import {
   Bar,
   Brand,
@@ -122,14 +129,26 @@ const categoryOptions = [
   "Other",
 ];
 function useRoute() {
-  const [route, setRoute] = useState(location.hash.slice(1) || "home");
+  const [route, setRoute] = useState(() => {
+    migrateLegacyRoute();
+    return currentRoute();
+  });
   useEffect(() => {
     const change = () => {
-      setRoute(location.hash.slice(1) || "home");
+      migrateLegacyRoute();
+      setRoute(currentRoute());
       window.scrollTo(0, 0);
     };
+    window.addEventListener("popstate", change);
+    window.addEventListener("settleup-navigation", change);
     window.addEventListener("hashchange", change);
-    return () => window.removeEventListener("hashchange", change);
+    document.addEventListener("click", handleAppLink);
+    return () => {
+      window.removeEventListener("popstate", change);
+      window.removeEventListener("settleup-navigation", change);
+      window.removeEventListener("hashchange", change);
+      document.removeEventListener("click", handleAppLink);
+    };
   }, []);
   return route;
 }
@@ -239,7 +258,7 @@ export default function App() {
     return () => query.removeEventListener("change", apply);
   }, [s?.profile.theme]);
   const go = (path: string) => {
-    location.hash = path;
+    navigate(path);
     setModal(null);
   };
   const safeAct: Action = async (name, args) => {
@@ -1370,8 +1389,7 @@ function AddDebt() {
               </Field>
             </div>
             <Field label="First due date">
-              <input
-                type="date"
+              <DateInput
                 min="1900-01-01"
                 max="2200-12-31"
                 value={start}
@@ -1388,37 +1406,42 @@ function AddDebt() {
           </div>
           {rows.map((r, index) => (
             <div className="schedule-editor" key={index}>
-              <input
-                required
-                type="date"
-                aria-label={`Installment ${index + 1} due date`}
-                min="1900-01-01"
-                max="2200-12-31"
-                value={r.due_date}
-                onInput={(e) =>
-                  setRows(
-                    rows.map((x, j) =>
-                      j === index
-                        ? { ...x, due_date: e.currentTarget.value }
-                        : x,
-                    ),
-                  )
-                }
-              />
-              <input
-                required
-                inputMode="decimal"
-                aria-label={`Installment ${index + 1} amount`}
-                placeholder="50.00"
-                value={r.amount}
-                onChange={(e) =>
-                  setRows(
-                    rows.map((x, j) =>
-                      j === index ? { ...x, amount: e.target.value } : x,
-                    ),
-                  )
-                }
-              />
+              <label className="installment-field schedule-date">
+                <span>Due date</span>
+                <DateInput
+                  required
+                  aria-label={`Installment ${index + 1} due date`}
+                  min="1900-01-01"
+                  max="2200-12-31"
+                  value={r.due_date}
+                  onInput={(e) =>
+                    setRows(
+                      rows.map((x, j) =>
+                        j === index
+                          ? { ...x, due_date: e.currentTarget.value }
+                          : x,
+                      ),
+                    )
+                  }
+                />
+              </label>
+              <label className="installment-field schedule-amount">
+                <span>Amount ($)</span>
+                <input
+                  required
+                  inputMode="decimal"
+                  aria-label={`Installment ${index + 1} amount`}
+                  placeholder="50.00"
+                  value={r.amount}
+                  onChange={(e) =>
+                    setRows(
+                      rows.map((x, j) =>
+                        j === index ? { ...x, amount: e.target.value } : x,
+                      ),
+                    )
+                  }
+                />
+              </label>
               <button
                 type="button"
                 className="icon-button"
@@ -1999,9 +2022,9 @@ function SettingsPage({
               support@settleupapp.cloud.
             </p>
             <div className="row wrap">
-              <a href="#help">Help &amp; support</a>
-              <a href="#privacy">Privacy</a>
-              <a href="#terms">Terms</a>
+              <a href="/help">Help &amp; support</a>
+              <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms</a>
             </div>
           </section>
           <section className="panel form-section">
@@ -2229,9 +2252,8 @@ function PaymentForm({ id, close }: { id: string; close: () => void }) {
         />
       </Field>
       <Field label="Payment date">
-        <input
+        <DateInput
           required
-          type="date"
           min="1900-01-01"
           max={day}
           value={date}
@@ -2476,9 +2498,8 @@ function EditInstallment({ id, close }: { id: string; close: () => void }) {
         reminders.
       </p>
       <Field label="Due date">
-        <input
+        <DateInput
           required
-          type="date"
           min="1900-01-01"
           max="2200-12-31"
           value={date}

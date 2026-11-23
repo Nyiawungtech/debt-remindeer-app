@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-function runtime() {
+function runtime(offline = false) {
   const handlers: Record<string, Function> = {},
     shown: any[] = [],
     stored: any[] = [],
@@ -40,6 +40,7 @@ function runtime() {
       Promise,
       fetch: async (request: any) => {
         fetched.push(request);
+        if (offline) throw new Error("offline");
         return {
           ok: true,
           clone() {
@@ -56,7 +57,8 @@ function runtime() {
             stored.push(args);
           },
         }),
-        match: async () => null,
+        match: async (path: string) =>
+          offline && path === "/index.html" ? { shell: true } : null,
         keys: async () => [],
         delete: async () => {},
       },
@@ -120,10 +122,16 @@ it("preserves device subscriptions when updating the app shell", async () => {
 });
 it("shows malformed push safely and does not open external or credential-bearing notification links", async () => {
   const r = runtime();
-  for (const value of [
-    "https://evil.test/",
-    "https://settleup.example/?code=secret#debts",
-    "/#debt/123",
+  for (const [value, target] of [
+    ["https://evil.test/", "/reminders"],
+    ["https://settleup.example/?code=secret#debts", "/reminders"],
+    ["/#debt/123", "/debt/123"],
+    ["/debt/123", "/debt/123"],
+    ["/calendar", "/calendar"],
+    ["/api/account", "/reminders"],
+    ["/#access_token=secret", "/reminders"],
+    ["/debt/123#access_token=secret", "/reminders"],
+    ["https://user:password@settleup.example/debts", "/reminders"],
   ]) {
     let task: Promise<unknown>;
     r.handlers.push({
@@ -132,18 +140,13 @@ it("shows malformed push safely and does not open external or credential-bearing
     });
     await task!;
     const options = r.shown.at(-1)[1];
-    expect(options.data.url).toBe(
-      value === "/#debt/123" ? value : "/#reminders",
-    );
+    expect(options.data.url).toBe(target);
     r.handlers.notificationclick({
       notification: { close() {}, data: { url: value } },
       waitUntil: (p: Promise<unknown>) => (task = p),
     });
     await task!;
-    expect(r.fetched.at(-1)).toBe(
-      "https://settleup.example" +
-        (value === "/#debt/123" ? value : "/#reminders"),
-    );
+    expect(r.fetched.at(-1)).toBe("https://settleup.example" + target);
   }
   let task: Promise<unknown>;
   r.handlers.push({
@@ -156,4 +159,19 @@ it("shows malformed push safely and does not open external or credential-bearing
   });
   await task!;
   expect(r.shown.at(-1)[0]).toBe("SettleUp reminder");
+});
+
+it("opens the public cached shell for a clean deep route while offline", async () => {
+  const r = runtime(true);
+  let task: Promise<unknown>;
+  r.handlers.fetch({
+    request: {
+      url: "https://settleup.example/debt/123",
+      method: "GET",
+      mode: "navigate",
+    },
+    respondWith: (value: Promise<unknown>) => (task = value),
+  });
+  expect(await task!).toEqual({ shell: true });
+  expect(r.stored).toHaveLength(0);
 });

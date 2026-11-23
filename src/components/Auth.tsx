@@ -212,8 +212,8 @@ export function Auth({
                 onChange={(e) => setAgreed(e.target.checked)}
               />
               <span>
-                I agree to the <a href="#terms">Terms</a> and acknowledge the{" "}
-                <a href="#privacy">Privacy Policy</a>.
+                I agree to the <a href="/terms">Terms</a> and acknowledge the{" "}
+                <a href="/privacy">Privacy Policy</a>.
               </span>
             </label>
           )}
@@ -269,9 +269,9 @@ export function Auth({
           </small>
         </div>
         <nav className="legal-links" aria-label="Help and policies">
-          <a href="#help">Help</a>
-          <a href="#privacy">Privacy</a>
-          <a href="#terms">Terms</a>
+          <a href="/help">Help</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
         </nav>
         <p className="legal-note">
           SettleUp tracks payments you make elsewhere. It doesn’t transfer money

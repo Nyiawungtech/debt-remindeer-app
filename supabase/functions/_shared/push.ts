@@ -37,7 +37,7 @@ export function pushMessage(jobId: string, p: PushPayload) {
       ? "You have a payment coming up. Open SettleUp to review your schedule."
       : `${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(p.amount_cents / 100)} for ${p.name} is due ${p.due_date}.`,
     tag: `settleup-${jobId}`,
-    url: `/#debt/${encodeURIComponent(p.debt_id)}`,
+    url: `/debt/${encodeURIComponent(p.debt_id)}`,
   });
 }
 

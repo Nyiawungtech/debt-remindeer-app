@@ -79,20 +79,32 @@ self.addEventListener("fetch", (event) => {
 function localTarget(value) {
   try {
     const url = new URL(
-      typeof value === "string" ? value : "/#reminders",
+      typeof value === "string" ? value : "/reminders",
       self.location.origin,
     );
     if (
-      url.origin === self.location.origin &&
-      !url.username &&
-      !url.password &&
-      url.pathname === "/" &&
-      !url.search &&
-      url.hash.startsWith("#")
+      url.origin !== self.location.origin ||
+      url.username ||
+      url.password ||
+      url.search
     )
-      return "/" + url.hash;
+      return "/reminders";
+    // Accept old notifications as well as current clean routes. Never pass
+    // through credential fragments, API paths, or arbitrary same-origin URLs.
+    const path =
+      url.pathname === "/" && url.hash.startsWith("#")
+        ? "/" + url.hash.slice(1)
+        : !url.hash
+          ? url.pathname
+          : "";
+    if (
+      /^\/(?:debt\/[a-zA-Z0-9-]+|add|debts|calendar|reminders|settings|home|help|privacy|terms)?$/.test(
+        path,
+      )
+    )
+      return path === "/home" ? "/" : path;
   } catch {}
-  return "/#reminders";
+  return "/reminders";
 }
 self.addEventListener("push", (event) => {
   let data = {};

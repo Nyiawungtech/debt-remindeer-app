@@ -37,7 +37,7 @@ export async function sendReminderEmail(
       from: config.from,
       to: [p.email],
       subject: "Your SettleUp payment reminder",
-      text: `SettleUp: ${detail}\n\nView your schedule: ${origin}/#debt/${p.debt_id}\nManage reminders: ${origin}/#settings`,
+      text: `SettleUp: ${detail}\n\nView your schedule: ${origin}/debt/${encodeURIComponent(p.debt_id)}\nManage reminders: ${origin}/settings`,
     }),
     signal: AbortSignal.timeout(20000),
   });

@@ -53,7 +53,8 @@ it("sends a private email to the account with a stable idempotency key and setti
   });
   const body = JSON.parse(init?.body as string);
   expect(body.to).toEqual(["owner@example.com"]);
-  expect(body.text).toContain("https://settleup.example/#settings");
+  expect(body.text).toContain("https://settleup.example/settings");
+  expect(body.text).toContain("https://settleup.example/debt/debt-id");
   expect(body.text).not.toContain("Amazon");
   expect(body.text).not.toContain("50.25");
 });
@@ -128,7 +129,7 @@ it("keeps push content private by default and restricts delivery to browser push
   const message = JSON.parse(pushMessage("job", push));
   expect(message.body).not.toContain("Amazon");
   expect(message.body).not.toContain("50.25");
-  expect(message.url).toBe("/#debt/debt-id");
+  expect(message.url).toBe("/debt/debt-id");
   expect(
     JSON.parse(pushMessage("job", { ...push, private_content: false })).body,
   ).toContain("$50.25");

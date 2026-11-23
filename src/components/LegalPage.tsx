@@ -151,7 +151,7 @@ export function LegalPage({
             <p>
               These terms apply to the SettleUp public beta at
               settleupapp.cloud. By creating an account, you agree to these
-              terms and acknowledge the <a href="#privacy">Privacy Policy</a>.
+              terms and acknowledge the <a href="/privacy">Privacy Policy</a>.
               Contact <a href={`mailto:${contact}`}>{contact}</a> for help.
             </p>
             <h2>What SettleUp does</h2>
@@ -204,9 +204,9 @@ export function LegalPage({
           </>
         )}
         <nav className="legal-links" aria-label="Help and policies">
-          <a href="#help">Help</a>
-          <a href="#privacy">Privacy</a>
-          <a href="#terms">Terms</a>
+          <a href="/help">Help</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
           <a href={`mailto:${contact}`}>Contact support</a>
         </nav>
       </article>
