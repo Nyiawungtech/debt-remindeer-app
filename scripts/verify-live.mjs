@@ -28,7 +28,14 @@ for (let offset = 0; offset < paths.length; offset += 6) {
     const local = await readFile("dist" + path);
     const remote = Buffer.from(await (await get(path)).arrayBuffer());
     const hash = value => createHash("sha256").update(value).digest("hex");
-    if (hash(local) !== hash(remote)) throw new Error("Asset mismatch: " + path);
+    if (path.endsWith(".png")) {
+      const png = bytes => bytes.length >= 24 && bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+      const info = bytes => ({ bytes: bytes.length, signature: bytes.subarray(0, 12).toString("hex"), width: png(bytes) ? bytes.readUInt32BE(16) : null, height: png(bytes) ? bytes.readUInt32BE(20) : null });
+      const expectedImage = info(local), actualImage = info(remote);
+      console.log("LIVE_IMAGE " + JSON.stringify({ path, expected: expectedImage, actual: actualImage, exactBytes: hash(local) === hash(remote) }));
+      if (!png(remote) || expectedImage.width !== actualImage.width || expectedImage.height !== actualImage.height)
+        throw new Error("Image dimensions or format mismatch: " + path);
+    } else if (hash(local) !== hash(remote)) throw new Error("Asset mismatch: " + path);
     verified++;
   }));
 }
