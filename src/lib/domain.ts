@@ -168,6 +168,27 @@ export function emptyCopy(s: Snapshot, period: Period, day: string) {
     text: "There are no payments scheduled for this period. Enjoy a little breathing room.",
   };
 }
+export function scheduleDates(
+  count: number,
+  start: string,
+  frequency: "weekly" | "biweekly" | "monthly",
+) {
+  if (!Number.isInteger(count) || count < 1 || count > 120)
+    throw new Error("Choose between 1 and 120 installments.");
+  if (!["weekly", "biweekly", "monthly"].includes(frequency))
+    throw new Error("Choose a payment frequency.");
+  if (!start) throw new Error("Choose the first due date.");
+  const anchor = Temporal.PlainDate.from(start);
+  const dates = Array.from({ length: count }, (_, index) =>
+    (frequency === "monthly"
+      ? anchor.add({ months: index })
+      : anchor.add({ days: index * (frequency === "weekly" ? 7 : 14) })
+    ).toString(),
+  );
+  if (dates.some((date) => date < "1900-01-01" || date > "2200-12-31"))
+    throw new Error("Payment dates must be between 1900 and 2200.");
+  return dates;
+}
 export function splitSchedule(
   total: number,
   count: number,
@@ -184,13 +205,9 @@ export function splitSchedule(
     count > total
   )
     throw new Error("Choose 1–120 installments, each worth at least one cent.");
-  const anchor = Temporal.PlainDate.from(start);
   const base = Math.floor(total / count);
-  return Array.from({ length: count }, (_, index) => ({
-    due_date: (frequency === "monthly"
-      ? anchor.add({ months: index })
-      : anchor.add({ days: index * (frequency === "weekly" ? 7 : 14) })
-    ).toString(),
+  return scheduleDates(count, start, frequency).map((due_date, index) => ({
+    due_date,
     amount_cents: base + (index === count - 1 ? total - base * count : 0),
   }));
 }

@@ -53,7 +53,6 @@ import {
   toCents,
   today,
   validatePayment,
-  validateSchedule,
   type Channel,
   type Debt,
   type Installment,
@@ -71,6 +70,11 @@ import { LegalPage } from "./components/LegalPage";
 import { Auth } from "./components/Auth";
 import { DateInput } from "./components/DateInput";
 import { clearPendingConfirmation } from "./lib/confirmation";
+import {
+  debtScheduleFromDraft,
+  draftSummary,
+  generateScheduleDraft,
+} from "./lib/schedule-draft";
 import {
   currentRoute,
   handleAppLink,
@@ -1245,34 +1249,41 @@ function DebtDetail({ id }: { id: string }) {
   );
 }
 function AddDebt() {
-  const { busy, act, go, toast } = useUI();
+  const { busy, act, go, toast, day } = useUI();
   const [id] = useState(() => crypto.randomUUID());
   const [name, setName] = useState(""),
     [lender, setLender] = useState(""),
     [category, setCategory] = useState("Shopping"),
     [notes, setNotes] = useState(""),
-    [total, setTotal] = useState(""),
+    [totalToSplit, setTotalToSplit] = useState(""),
+    [eachAmount, setEachAmount] = useState(""),
     [count, setCount] = useState(4),
-    [start, setStart] = useState(today()),
+    [start, setStart] = useState(day),
     [frequency, setFrequency] = useState<"weekly" | "biweekly" | "monthly">(
       "biweekly",
     );
-  const [rows, setRows] = useState([{ due_date: today(), amount: "" }]);
+  const [rows, setRows] = useState(() =>
+    generateScheduleDraft(4, day, "biweekly"),
+  );
   const [error, setError] = useState("");
-  const sum = rows.reduce((n, r) => {
-    try {
-      return n + toCents(r.amount || "0");
-    } catch {
-      return n;
-    }
-  }, 0);
+  const summary = draftSummary(rows);
   function generate() {
     try {
+      setRows(generateScheduleDraft(count, start, frequency, rows, eachAmount));
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  function splitTotal() {
+    try {
       setRows(
-        splitSchedule(toCents(total), count, start, frequency).map((r) => ({
-          due_date: r.due_date,
-          amount: (r.amount_cents / 100).toFixed(2),
-        })),
+        splitSchedule(toCents(totalToSplit), count, start, frequency).map(
+          (r) => ({
+            due_date: r.due_date,
+            amount: (r.amount_cents / 100).toFixed(2),
+          }),
+        ),
       );
       setError("");
     } catch (e) {
@@ -1282,19 +1293,14 @@ function AddDebt() {
   async function save(e: FormEvent) {
     e.preventDefault();
     try {
-      const amount = toCents(total),
-        schedule = rows.map((r) => ({
-          due_date: r.due_date,
-          amount_cents: toCents(r.amount),
-        }));
-      validateSchedule(amount, schedule);
+      const { total, schedule } = debtScheduleFromDraft(rows);
       await act("create_debt", {
         p_id: id,
         p_name: name,
         p_lender: lender,
         p_category: category,
         p_notes: notes,
-        p_total: amount,
+        p_total: total,
         p_schedule: schedule,
       });
       toast("Debt added. A clearer picture starts here.");
@@ -1347,15 +1353,6 @@ function AddDebt() {
               </select>
             </Field>
           </div>
-          <Field label="Total debt amount ($)">
-            <input
-              required
-              inputMode="decimal"
-              placeholder="200.00"
-              value={total}
-              onChange={(e) => setTotal(e.target.value)}
-            />
-          </Field>
           <Field label="Notes (optional)">
             <textarea
               maxLength={2000}
@@ -1369,7 +1366,8 @@ function AddDebt() {
         <section className="panel form-section">
           <h2>Your payment schedule.</h2>
           <p className="muted">
-            Split evenly, or enter each installment yourself.
+            Generate the dates, then enter the amount for each installment. Your
+            debt total is calculated automatically.
           </p>
           <div className="schedule-generator">
             <div className="form-grid">
@@ -1403,9 +1401,38 @@ function AddDebt() {
                 onInput={(e) => setStart(e.currentTarget.value)}
               />
             </Field>
+            <Field
+              label="Amount per installment ($)"
+              hint="Optional. Leave blank to enter different amounts on the cards below."
+            >
+              <input
+                inputMode="decimal"
+                placeholder="e.g. 50.00"
+                value={eachAmount}
+                onChange={(e) => setEachAmount(e.target.value)}
+              />
+            </Field>
             <button type="button" className="secondary" onClick={generate}>
-              Create equal installments
+              Generate installments
             </button>
+            <p className="schedule-builder-hint">
+              Generating dates keeps amounts you’ve entered unless you supply an
+              amount above.
+            </p>
+            <details className="schedule-split">
+              <summary>Split a known total instead</summary>
+              <Field label="Total to split ($)">
+                <input
+                  inputMode="decimal"
+                  placeholder="e.g. 200.00"
+                  value={totalToSplit}
+                  onChange={(e) => setTotalToSplit(e.target.value)}
+                />
+              </Field>
+              <button type="button" className="secondary" onClick={splitTotal}>
+                Split total into installments
+              </button>
+            </details>
           </div>
           <div className="schedule-labels">
             <span>Due date</span>
@@ -1454,7 +1481,10 @@ function AddDebt() {
                 className="icon-button"
                 disabled={rows.length === 1}
                 aria-label={`Remove installment ${index + 1}`}
-                onClick={() => setRows(rows.filter((_, j) => j !== index))}
+                onClick={() => {
+                  setRows(rows.filter((_, j) => j !== index));
+                  setCount(rows.length - 1);
+                }}
               >
                 <X size={18} />
               </button>
@@ -1464,26 +1494,40 @@ function AddDebt() {
             type="button"
             className="text-button"
             disabled={rows.length >= 120}
-            onClick={() =>
+            onClick={() => {
               setRows([
                 ...rows,
-                { due_date: rows.at(-1)?.due_date || today(), amount: "" },
-              ])
-            }
+                { due_date: rows.at(-1)?.due_date || day, amount: "" },
+              ]);
+              setCount(rows.length + 1);
+            }}
           >
             <Plus size={17} />
             Add installment
           </button>
-          <div className="schedule-summary">
+          <div className="schedule-summary calculated-total">
             <span>
-              Schedule total <b>{money(sum)}</b>
+              {summary.missing ? "Total so far" : "Total debt amount"}
+              <b>
+                <output aria-label="Calculated debt total" aria-live="polite">
+                  {summary.error ? "—" : money(summary.total)}
+                </output>
+              </b>
             </span>
             <span>
-              Debt total <b>${total || "0.00"}</b>
+              <b>
+                {rows.length}{" "}
+                {rows.length === 1 ? "installment" : "installments"}
+              </b>
+              {summary.missing
+                ? `Enter ${summary.missing === 1 ? "the remaining amount" : `${summary.missing} remaining amounts`}.`
+                : summary.error
+                  ? "Check the installment amounts."
+                  : "Calculated from your payment schedule."}
             </span>
           </div>
         </section>
-        <ErrorText text={error} />
+        <ErrorText text={summary.error || error} />
         <div className="form-actions">
           <button type="button" className="ghost" onClick={() => go("debts")}>
             Cancel

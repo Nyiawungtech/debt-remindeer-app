@@ -1365,6 +1365,55 @@ body:has(.demo-banner) {
   font-weight: 600;
   margin-top: 5px;
 }
+.schedule-builder-hint {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.schedule-split {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.schedule-split > summary {
+  color: var(--purple-ink);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.schedule-split[open] > summary {
+  margin-bottom: 18px;
+}
+.schedule-split > button {
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.5;
+}
+.calculated-total {
+  align-items: center;
+  background: var(--purple-soft);
+}
+.calculated-total > span:first-child {
+  font-size: 14px;
+}
+.calculated-total > span:first-child b {
+  font-size: 26px;
+  letter-spacing: -0.8px;
+  overflow-wrap: anywhere;
+}
+.calculated-total > span:last-child {
+  max-width: 240px;
+  color: var(--muted);
+  text-align: right;
+  line-height: 1.7;
+}
+.calculated-total > span:last-child b {
+  color: var(--ink);
+  font-size: 14px;
+  margin-top: 0;
+}
 .form-actions,
 .modal-actions {
   display: flex;
@@ -2516,6 +2565,9 @@ legend {
   .form-page .schedule-summary,
   .form-page .form-actions {
     flex-wrap: wrap;
+  }
+  .calculated-total > span:last-child {
+    text-align: left;
   }
   .confirmation-card {
     padding: 26px 22px;
