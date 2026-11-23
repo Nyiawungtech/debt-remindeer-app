@@ -20,6 +20,7 @@ it("uses clean paths for every page and debt detail", () => {
     "help",
     "privacy",
     "terms",
+    "confirm-email",
     "debt/abc-123",
   ]) {
     const path = routePath(route);

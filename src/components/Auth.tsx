@@ -8,13 +8,22 @@ import {
 } from "lucide-react";
 import { appUrl, configured, supabase } from "../lib/client";
 import { Brand, ErrorText, Field } from "./ui";
+import { EmailConfirmation } from "./EmailConfirmation";
+import { navigate } from "../lib/navigation";
+import {
+  clearPendingConfirmation,
+  rememberConfirmation,
+  type PendingConfirmation,
+} from "../lib/confirmation";
 export function Auth({
   onDemo,
   recovery = false,
+  confirmation = false,
   onRecovered,
 }: {
   onDemo: () => void;
   recovery?: boolean;
+  confirmation?: boolean;
   onRecovered: () => void;
 }) {
   const [mode, setMode] = useState<"login" | "signup" | "reset" | "recovery">(
@@ -28,6 +37,7 @@ export function Auth({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [agreed, setAgreed] = useState(false);
+  const [pending, setPending] = useState<PendingConfirmation | null>(null);
   useEffect(() => {
     if (recovery) setMode("recovery");
   }, [recovery]);
@@ -59,8 +69,13 @@ export function Auth({
             emailRedirectTo: appUrl,
           },
         });
-        if (!result.error)
-          setNotice("Check your email to confirm your account, then sign in.");
+        if (!result.error) {
+          setPassword("");
+          if (!result.data.session) {
+            setPending(rememberConfirmation(email));
+            navigate("confirm-email");
+          }
+        }
       } else if (mode === "reset") {
         result = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: appUrl,
@@ -90,6 +105,24 @@ export function Auth({
     setNotice("");
     setPassword("");
   }
+  if (confirmation && !recovery)
+    return (
+      <EmailConfirmation
+        initial={pending}
+        onSignIn={(address) => {
+          setEmail(address);
+          change("login");
+          navigate("home");
+        }}
+        onUseAnotherEmail={() => {
+          clearPendingConfirmation();
+          setPending(null);
+          setEmail("");
+          change("signup");
+          navigate("home");
+        }}
+      />
+    );
   return (
     <main className="auth-layout">
       <section className="auth-story">

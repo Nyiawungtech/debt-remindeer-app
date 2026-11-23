@@ -70,6 +70,7 @@ import {
 import { LegalPage } from "./components/LegalPage";
 import { Auth } from "./components/Auth";
 import { DateInput } from "./components/DateInput";
+import { clearPendingConfirmation } from "./lib/confirmation";
 import {
   currentRoute,
   handleAppLink,
@@ -188,6 +189,7 @@ export default function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next);
+      if (event === "SIGNED_IN") clearPendingConfirmation();
       if (event === "PASSWORD_RECOVERY") setRecovery(true);
     });
     return () => {
@@ -195,6 +197,10 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, []);
+  useEffect(() => {
+    if (session?.user.email_confirmed_at && route === "confirm-email")
+      navigate("home");
+  }, [session?.user.email_confirmed_at, route]);
   useEffect(() => {
     if (!session) {
       setMfaChecked(true);
@@ -303,6 +309,7 @@ export default function App() {
             go("home");
           }}
           recovery={recovery}
+          confirmation={route === "confirm-email"}
           onRecovered={() => setRecovery(false)}
         />
         {toast && (

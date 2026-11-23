@@ -8,6 +8,7 @@ const pages = new Set([
   "help",
   "privacy",
   "terms",
+  "confirm-email",
 ]);
 
 export function routeFromPath(pathname: string): string | null {

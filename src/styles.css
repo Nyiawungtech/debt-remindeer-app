@@ -1180,6 +1180,19 @@ body:has(.demo-banner) {
 .form-page {
   max-width: 820px;
 }
+.form-page > form {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.form-page > form > .form-actions,
+.form-page > form > .error {
+  margin: 0;
+}
+.form-page .form-section,
+.schedule-generator {
+  min-width: 0;
+}
 .form-section {
   padding: 26px;
 }
@@ -1198,7 +1211,7 @@ body:has(.demo-banner) {
   margin-bottom: 19px;
   min-width: 0;
 }
-.field > span {
+.field > span:not(.date-control) {
   font-size: 14px;
   font-weight: 600;
 }
@@ -1217,6 +1230,8 @@ body:has(.demo-banner) {
   background: var(--bg);
   color: var(--ink);
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   min-height: 47px;
   min-width: 0;
   font-size: 16px;
@@ -1224,12 +1239,50 @@ body:has(.demo-banner) {
 .field textarea {
   resize: vertical;
 }
-.date-input {
+.date-control {
   display: block;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
+  padding: 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--date-surface, var(--bg));
+  cursor: pointer;
+}
+.date-control:focus-within {
+  outline: 3px solid var(--purple);
+  outline-offset: 4px;
+}
+/* iOS WebKit 301648 adds inline padding to a 100%-wide native date
+   field. Keep all inline spacing on the wrapper, never the input. */
+.date-control > input.date-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-inline-size: 0;
+  min-height: 45px;
+  height: 45px;
+  margin: 0;
+  padding: 10px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
   text-align: left;
   cursor: pointer;
+}
+.date-control > input.date-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+.date-input::-webkit-datetime-edit {
+  padding: 0;
+  min-width: 0;
 }
 .date-input::-webkit-date-and-time-value {
   text-align: left;
@@ -1246,7 +1299,7 @@ body:has(.demo-banner) {
   flex-direction: column;
   gap: 8px;
 }
-.installment-field > span {
+.installment-field > span:not(.date-control) {
   display: none;
   font-size: 14px;
   font-weight: 600;
@@ -1271,6 +1324,9 @@ body:has(.demo-banner) {
 .schedule-generator .field input,
 .schedule-generator .field select {
   background: var(--panel);
+}
+.schedule-generator .date-control {
+  --date-surface: var(--panel);
 }
 .schedule-editor {
   display: grid;
@@ -1686,6 +1742,78 @@ legend {
   display: grid;
   grid-template-columns: 1fr 1fr;
   min-height: 100vh;
+}
+.confirmation-page {
+  min-height: 100dvh;
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  background: radial-gradient(ellipse at top, var(--hero), transparent 65%);
+}
+.confirmation-card {
+  width: min(100%, 460px);
+  min-width: 0;
+  padding: 32px;
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  background: var(--panel);
+  box-shadow: 0 20px 65px #35284a0c;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+.confirmation-icon {
+  width: 70px;
+  height: 70px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  background: var(--purple-soft);
+  color: var(--purple-ink);
+}
+.confirmation-card h1 {
+  font-size: 28px;
+  outline: none;
+}
+.confirmation-card > .eyebrow {
+  color: var(--purple-ink);
+  font-size: 12px;
+}
+.confirmation-card > .muted,
+.confirmation-instructions {
+  font-size: 14px;
+  line-height: 1.8;
+}
+.confirmation-address {
+  max-width: 100%;
+  padding: 12px 16px;
+  background: var(--purple-soft);
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.confirmation-card form {
+  width: 100%;
+  min-width: 0;
+}
+.confirmation-card .field {
+  text-align: left;
+}
+.confirmation-card button {
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.5;
+}
+.confirmation-hint,
+.confirmation-support {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
 }
 .auth-story {
   padding: 50px 65px;
@@ -2335,7 +2463,10 @@ legend {
   .form-grid {
     gap: 13px;
   }
-  .field > span {
+  .form-page .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .field > span:not(.date-control) {
     font-size: 13px;
   }
   .field {
@@ -2346,6 +2477,13 @@ legend {
   }
   .schedule-generator .form-grid {
     grid-template-columns: 1fr;
+  }
+  .schedule-generator > .secondary {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.5;
   }
   .schedule-editor {
     gap: 12px;
@@ -2358,8 +2496,11 @@ legend {
   .schedule-date {
     grid-column: 1 / -1;
   }
-  .installment-field > span {
+  .installment-field > span:not(.date-control) {
     display: block;
+  }
+  .schedule-editor .date-control {
+    --date-surface: var(--panel);
   }
   .schedule-editor input {
     padding: 12px;
@@ -2371,6 +2512,13 @@ legend {
     height: 47px;
     min-width: 44px;
     align-self: end;
+  }
+  .form-page .schedule-summary,
+  .form-page .form-actions {
+    flex-wrap: wrap;
+  }
+  .confirmation-card {
+    padding: 26px 22px;
   }
   .schedule-labels {
     display: none;
